@@ -1,0 +1,291 @@
+// Schema Prisma — portage du modele Access (voir
+// 05_Documentation/02_Technique/Modele_Donnees.md et Specification_Version_Web.md).
+// Les durees/heures sont stockees en MINUTES ENTIERES (Int), jamais en Date/Heure,
+// pour eviter les pieges d'arithmetique horaire deja rencontres sur la version
+// Access (voir Journal_Decisions.md D13).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RoleCode {
+  ADMIN
+  COMPTABLE
+  PROFESSEUR
+}
+
+enum StatutProfesseur {
+  PERMANENT
+  VACATAIRE
+  AUTRE // statut non reconnu : traite comme VACATAIRE et signale
+}
+
+enum StatutCours {
+  PLANIFIE
+  ARRIVEE_ENREGISTREE
+  EN_COURS
+  FIN_ENREGISTREE
+  VALIDE
+  A_CONTROLER
+  NON_VALIDE
+  INCOMPLET
+  ABSENT
+  CLOTURE
+}
+
+enum StatutPeriode {
+  OUVERTE
+  CLOTUREE
+}
+
+enum StatutRapport {
+  OFFICIEL
+  REMPLACE
+}
+
+enum SensArrondi {
+  PLUS_PROCHE
+  INFERIEUR
+  SUPERIEUR
+}
+
+model Utilisateur {
+  id               Int        @id @default(autoincrement())
+  role             RoleCode
+  professeur       Professeur? @relation(fields: [professeurId], references: [id])
+  professeurId     Int?       @unique
+  nomUtilisateur   String?    @unique // NULL pour un professeur (identifie par PIN)
+  motDePasseHash   String?
+  motDePasseSel    String?
+  codePinHash      String?
+  codePinSel       String?
+  actif            Boolean    @default(true)
+  dateCreation     DateTime   @default(now())
+  dateModification DateTime?  @updatedAt
+  dernierAcces     DateTime?
+
+  coursValides     Cours[]      @relation("ValidePar")
+  importsLog       ImportLog[]
+  auditEntries     Audit[]
+  periodesCloturees Periode[]  @relation("ClosePar")
+  periodesReouvertes Periode[] @relation("RouvertePar")
+  rapportsGeneres  Rapport[]
+
+  @@map("utilisateurs")
+}
+
+model Professeur {
+  id                    Int       @id @default(autoincrement())
+  matricule             String    @unique
+  nom                   String
+  prenom                String
+  telephone             String?
+  email                 String?
+  statut                StatutProfesseur @default(VACATAIRE)
+  tauxHoraireSpecifique Decimal?  @db.Decimal(10, 2)
+  salaireFixeMensuel    Decimal?  @db.Decimal(10, 2) // obligatoire si PERMANENT (verifie en app)
+  quotaHeuresMensuelMin Int?      // minutes ; obligatoire si PERMANENT
+  actif                 Boolean   @default(true)
+  dateCreation          DateTime  @default(now())
+  dateModification      DateTime? @updatedAt
+
+  utilisateur    Utilisateur?
+  emploisDuTemps EmploiDuTemps[]
+  cours          Cours[]
+
+  @@map("professeurs")
+}
+
+model Classe {
+  id         Int      @id @default(autoincrement())
+  nomClasse  String   @unique
+  niveau     String?
+  actif      Boolean  @default(true)
+
+  emploisDuTemps EmploiDuTemps[]
+  cours          Cours[]
+
+  @@map("classes")
+}
+
+model Matiere {
+  id        Int     @id @default(autoincrement())
+  libelle   String  @unique
+  actif     Boolean @default(true)
+
+  emploisDuTemps EmploiDuTemps[]
+  cours          Cours[]
+
+  @@map("matieres")
+}
+
+model EmploiDuTemps {
+  id                 Int       @id @default(autoincrement())
+  professeur         Professeur @relation(fields: [professeurId], references: [id])
+  professeurId       Int
+  classe             Classe     @relation(fields: [classeId], references: [id])
+  classeId           Int
+  matiere            Matiere    @relation(fields: [matiereId], references: [id])
+  matiereId          Int
+  jourSemaine        Int        // 1=Lundi ... 7=Dimanche
+  heureDebutMin      Int        // minutes depuis minuit
+  heureFinMin        Int        // minutes depuis minuit, doit etre > heureDebutMin
+  dateDebutValidite  DateTime
+  dateFinValidite    DateTime?  // NULL = sans fin
+  actif              Boolean    @default(true)
+  dateImport         DateTime?
+  importLog          ImportLog? @relation(fields: [importLogId], references: [id])
+  importLogId        Int?
+
+  cours Cours[]
+
+  @@index([professeurId, jourSemaine, dateDebutValidite])
+  @@map("emplois_du_temps")
+}
+
+model Cours {
+  id                  Int       @id @default(autoincrement())
+  emploiDuTemps       EmploiDuTemps? @relation(fields: [emploiDuTempsId], references: [id])
+  emploiDuTempsId     Int?
+  professeur          Professeur @relation(fields: [professeurId], references: [id])
+  professeurId        Int
+  classe              Classe     @relation(fields: [classeId], references: [id])
+  classeId            Int
+  matiere             Matiere    @relation(fields: [matiereId], references: [id])
+  matiereId           Int
+  dateCours           DateTime   // partie date seule exploitee (00:00)
+  heureDebutPrevueMin Int
+  heureFinPrevueMin   Int
+  heureArriveeReelle  DateTime?  // horodatage exact ecrit au clic, jamais deduit
+  heureFinReelle      DateTime?  // idem
+  dureePrevueMin      Int
+  dureeReelleMin      Int?
+  ecartArriveeMin     Int?
+  ecartDepartMin      Int?
+  dureeValideeMin     Int?       // seule valeur utilisee en comptabilisation
+  statut              StatutCours @default(PLANIFIE)
+  motifValidation     String?
+  dateValidation      DateTime?
+  validePar           Utilisateur? @relation("ValidePar", fields: [validateurId], references: [id])
+  validateurId         Int?
+  periode             Periode?   @relation(fields: [periodeId], references: [id])
+  periodeId           Int?
+  dateCreation        DateTime   @default(now())
+  dateModification    DateTime?  @updatedAt
+
+  @@unique([professeurId, dateCours, heureDebutPrevueMin])
+  @@map("cours")
+}
+
+model RegleValidation {
+  id                   Int      @id @default(autoincrement())
+  toleranceArriveeMin   Int
+  toleranceDepartMin    Int
+  retardMaxAccepteMin   Int
+  delaiAbsenceMin       Int
+  arrondiMin            Int      @default(0)
+  sensArrondi           SensArrondi @default(PLUS_PROCHE)
+  tauxHoraireGeneral    Decimal  @db.Decimal(10, 2)
+  dateApplication       DateTime
+  actif                 Boolean  @default(true)
+  dateCreation          DateTime @default(now())
+  dateModification      DateTime? @updatedAt
+
+  @@map("regles_validation")
+}
+
+model Periode {
+  id                   Int       @id @default(autoincrement())
+  libelle              String    @unique // ex. "2026-09"
+  dateDebut            DateTime
+  dateFin              DateTime
+  statut               StatutPeriode @default(OUVERTE)
+  dateCloture          DateTime?
+  closePar             Utilisateur? @relation("ClosePar", fields: [closeParId], references: [id])
+  closeParId           Int?
+  dateReouverture       DateTime?
+  rouvertePar          Utilisateur? @relation("RouvertePar", fields: [rouverteParId], references: [id])
+  rouverteParId        Int?
+  motifReouverture      String?
+  tauxHoraireApplique   Decimal?  @db.Decimal(10, 2)
+
+  cours   Cours[]
+  rapports Rapport[]
+
+  @@map("periodes")
+}
+
+model Rapport {
+  id                     Int       @id @default(autoincrement())
+  numeroRapport          String    // RPT-AAAA-MM-NNNNNN
+  version                Int       @default(1)
+  periode                Periode   @relation(fields: [periodeId], references: [id])
+  periodeId              Int
+  typeRapport            String    // MENSUEL | HEBDOMADAIRE | PAR_PROFESSEUR | ANOMALIES
+  dateGeneration         DateTime  @default(now())
+  generePar              Utilisateur @relation(fields: [genereParId], references: [id])
+  genereParId            Int
+  heuresTotalesMin       Int?
+  montantTotal           Decimal?  @db.Decimal(12, 2)
+  donneesCanoniquesJson  String    // snapshot deterministe ayant servi au calcul du hash
+  hashRapport            String    // SHA-256 hexadecimal
+  codeVerification       String    // VFY-XXXX-XXXX
+  statut                 StatutRapport @default(OFFICIEL)
+  cheminPdf              String?
+  cheminExcel            String?
+
+  @@unique([numeroRapport, version])
+  @@map("rapports")
+}
+
+model Audit {
+  id              Int       @id @default(autoincrement())
+  dateHeure       DateTime  @default(now())
+  utilisateur     Utilisateur @relation(fields: [utilisateurId], references: [id])
+  utilisateurId   Int
+  action          String
+  tableConcernee  String?
+  idEnregistrement Int?
+  ancienneValeur  String?
+  nouvelleValeur  String?
+  motif           String?
+
+  @@map("audit")
+}
+
+model ImportLog {
+  id                      Int       @id @default(autoincrement())
+  dateImport              DateTime  @default(now())
+  importePar              Utilisateur? @relation(fields: [importeParId], references: [id])
+  importeParId            Int?
+  nomFichier              String?
+  lignesLues              Int       @default(0)
+  lignesImportees         Int       @default(0)
+  lignesRejetees          Int       @default(0)
+  detailErreurs           String?
+  detailAvertissements    String?
+
+  emploisDuTemps EmploiDuTemps[]
+
+  @@map("imports_log")
+}
+
+model JourNonOuvre {
+  id       Int      @id @default(autoincrement())
+  dateJour DateTime @unique
+  libelle  String
+
+  @@map("jours_non_ouvres")
+}
+
+model Parametre {
+  cle    String @id
+  valeur String
+
+  @@map("parametres")
+}

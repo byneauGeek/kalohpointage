@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+/* Identité visuelle — Collège Privé Kaloh.
+   Bleu nuit institutionnel + or : cohérent sur l'ensemble des écrans
+   (administration en thème clair, pointage en thème sombre de prestige). */
+:root {
+  --background: #f6f7fb;
+  --foreground: #10172a;
+
+  --color-navy-950: #050b1a;
+  --color-navy-900: #0b1b38;
+  --color-navy-800: #122a52;
+  --color-navy-700: #1b3a6b;
+  --color-navy-600: #26497f;
+
+  --color-gold-600: #a9790a;
+  --color-gold-500: #c99b2e;
+  --color-gold-400: #dcb24f;
+  --color-gold-300: #e9cb7c;
+
+  --color-success: #15803d;
+  --color-success-bg: #ecfdf3;
+  --color-danger: #b91c1c;
+  --color-danger-bg: #fef2f2;
+  --color-warning: #b45309;
+  --color-warning-bg: #fffbeb;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: ui-sans-serif, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", ui-serif, serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.35s ease-out both;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background-image: linear-gradient(90deg, #e9ecf3 25%, #f5f6fa 37%, #e9ecf3 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
