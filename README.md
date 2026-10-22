@@ -44,13 +44,27 @@ npm run dev
 
 ## Déploiement (Vercel ou Netlify)
 
-### 1. Base de données (une seule fois)
+### 1. Base de données + stockage objet (une seule fois)
 
-Provisionner une base PostgreSQL managée — **Vercel/Netlify n'hébergent que
-l'application, jamais la base** :
-- [Neon](https://neon.tech) ou [Supabase](https://supabase.com) (fonctionnent
-  avec les deux plateformes), ou **Vercel Postgres** si vous déployez sur
-  Vercel. Récupérer l'URL de connexion fournie (`DATABASE_URL`).
+Le projet **Neon** "kaloh" est déjà provisionné (Postgres + Object Storage,
+branche `production`) — récupérer dans le tableau de bord
+[console.neon.tech](https://console.neon.tech) :
+- `DATABASE_URL` : la chaîne de connexion **pooled** (hôte en `-pooler`),
+  avec `?sslmode=require&pgbouncer=true`.
+- `DIRECT_URL` : la même base, connexion **directe** (même hôte SANS
+  `-pooler`) — utilisée uniquement par `prisma migrate` (voir
+  `prisma/schema.prisma`, champ `directUrl`) ; indispensable, car les
+  migrations DDL derrière le pooler PgBouncer peuvent échouer.
+- `STORAGE_ENDPOINT`/`STORAGE_REGION`/`STORAGE_BUCKET` : fournis par Neon
+  Object Storage (bucket `uploads`) ; créer un identifiant dédié
+  (`storage:read`+`storage:write`) pour obtenir `STORAGE_ACCESS_KEY_ID` et
+  `STORAGE_SECRET_ACCESS_KEY` — voir `.env.example` pour le format exact de
+  chaque variable.
+
+(Alternative possible sans Neon : [Supabase](https://supabase.com) ou
+**Vercel Postgres** pour la base — dans ce cas `STORAGE_*` restent vides et
+le fichier Excel original de chaque import n'est simplement pas conservé,
+le reste de l'application fonctionne normalement.)
 
 ### 2. Code source (une seule fois)
 
@@ -66,9 +80,11 @@ git push -u origin main
 
 | Variable | Valeur |
 |---|---|
-| `DATABASE_URL` | L'URL fournie par Neon/Supabase/Vercel Postgres (étape 1) |
+| `DATABASE_URL` | URL **pooled** Neon (étape 1), avec `pgbouncer=true` |
+| `DIRECT_URL` | URL **directe** Neon (étape 1), sans `-pooler` |
 | `AUTH_SECRET` | Une valeur aléatoire **différente de celle du `.env.example`** — générer avec `openssl rand -base64 32` (ou `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` sous Windows) |
 | `TZ` | Fuseau horaire de l'établissement, ex. `Africa/Abidjan` (impacte le calcul de « aujourd'hui » côté pointage — voir `.env.example`) |
+| `STORAGE_ENDPOINT`, `STORAGE_REGION`, `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, `STORAGE_SECRET_ACCESS_KEY` | Identifiants Neon Object Storage (étape 1) — facultatif, n'active que la conservation du fichier Excel original des imports |
 
 `SEED_ADMIN_USERNAME`/`SEED_ADMIN_PASSWORD` ne sont nécessaires que
 ponctuellement, à l'étape 5 — ne pas les laisser définis en permanence sur
@@ -121,6 +137,13 @@ rapprochement (absences/incomplets), validation automatique + traitement
 manuel des anomalies, périodes (clôture/réouverture avec garde-fous),
 comptabilisation Permanent/Vacataire, génération et contrôle de rapports
 avec empreinte SHA-256, paramètres, gestion des utilisateurs/PIN, audit.
+
+**Stockage objet (Neon Object Storage)** : chaque import d'emploi du temps
+conserve son fichier Excel original (`src/lib/storage.ts`) — lien
+« Retélécharger le fichier importé » depuis l'écran d'import, via une URL
+signée temporaire (10 min, `src/app/api/admin/fichier-import/route.ts`).
+Dégrade sans erreur si `STORAGE_*` n'est pas configuré : l'import fonctionne,
+seule la conservation du fichier est désactivée.
 
 **Progressive Web App** : `src/app/manifest.ts` (icônes générées à la volée
 via `next/og` dans `icon-192/`, `icon-512/`, `icon.tsx`, `apple-icon.tsx`),

@@ -10,6 +10,7 @@ import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
 import { parseHeureFrancaise, jourSemaineVersNumero } from "@/lib/heureUtils";
 import { eclaterClassesCombinees, trouverIdClasse } from "@/lib/classeMatching";
+import { stockerFichierImport } from "@/lib/storage";
 
 export type ResultatImport = {
   lignesLues: number;
@@ -150,6 +151,10 @@ export async function importerEmploiDuTemps(params: {
     );
   }
 
+  // Conserve le fichier Excel original pour tracabilite - n'echoue jamais
+  // l'import si le stockage objet est indisponible/non configure.
+  const cleStockageFichier = await stockerFichierImport(params.buffer, importLog.id, params.nomFichier);
+
   await prisma.importLog.update({
     where: { id: importLog.id },
     data: {
@@ -158,6 +163,7 @@ export async function importerEmploiDuTemps(params: {
       lignesRejetees,
       detailErreurs: erreurs.join("\n"),
       detailAvertissements: avertissements.join("\n"),
+      cleStockageFichier,
     },
   });
 

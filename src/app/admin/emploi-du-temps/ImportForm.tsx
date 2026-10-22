@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { UploadCloud, Loader2 } from "lucide-react";
+import { UploadCloud, Loader2, FileDown } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Select, Input, Label } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,7 @@ type Resultat = {
   lignesRejetees: number;
   erreurs: string[];
   avertissements: string[];
+  importLogId: number;
 };
 
 export default function FormulaireImport({ professeurs, matieres }: { professeurs: Option[]; matieres: Option[] }) {
@@ -95,6 +96,15 @@ export default function FormulaireImport({ professeurs, matieres }: { professeur
             <ul className="mt-2 list-inside list-disc text-[var(--color-danger)]">
               {resultat.erreurs.map((e, i) => <li key={i}>{e}</li>)}
             </ul>
+          )}
+          {resultat.importLogId && (
+            <a
+              href={`/api/admin/fichier-import?importLogId=${resultat.importLogId}`}
+              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-[var(--color-navy-800)] hover:underline"
+            >
+              <FileDown size={14} />
+              Retélécharger le fichier importé
+            </a>
           )}
         </motion.div>
       )}
