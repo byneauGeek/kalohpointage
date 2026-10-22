@@ -33,9 +33,12 @@ export default function FormulaireImport({ professeurs, matieres }: { professeur
     <Card className="mb-8 max-w-2xl">
       <CardTitle>Importer un emploi du temps (Excel)</CardTitle>
       <p className="mb-4 text-sm text-[var(--color-navy-900)]/55">
-        Colonnes dans cet ordre : Jour | Créneau | Heure début | Heure fin | Type | Classe. Seules les lignes
-        « Cours » sont importées. Les créneaux partagés entre classes (« 2ndeA/C ») et les variantes d&apos;écriture
-        (« 6è2 » = « 6ème2 ») sont reconnus automatiquement.
+Colonnes attendues (détectées par leur intitulé, peu importe l&apos;ordre ou le
+        nombre de lignes vides avant le tableau) : Jour, Heure début, Heure fin, Type, Classe — la colonne
+        Créneau est ignorée si présente. Si le fichier contient plusieurs feuilles, celle nommée « Données pour
+        Access » est utilisée en priorité. Seules les lignes « Cours » sont importées. Les créneaux partagés
+        entre classes (« 2ndeA/C ») et les variantes d&apos;écriture (« 6è2 » = « 6ème2 ») sont reconnus
+        automatiquement.
       </p>
       <form action={(fd) => soumettre(fd)} className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
