@@ -21,15 +21,19 @@ export async function POST(request: Request) {
 
   const buffer = Buffer.from(await fichier.arrayBuffer());
 
-  const resultat = await importerEmploiDuTemps({
-    buffer,
-    professeurId,
-    matiereId,
-    dateDebutValidite: new Date(dateDebutValidite),
-    dateFinValidite: dateFinValidite ? new Date(dateFinValidite) : null,
-    nomFichier: fichier.name,
-    importeParId: session.userId,
-  });
-
-  return NextResponse.json(resultat);
+  try {
+    const resultat = await importerEmploiDuTemps({
+      buffer,
+      professeurId,
+      matiereId,
+      dateDebutValidite: new Date(dateDebutValidite),
+      dateFinValidite: dateFinValidite ? new Date(dateFinValidite) : null,
+      nomFichier: fichier.name,
+      importeParId: session.userId,
+    });
+    return NextResponse.json(resultat);
+  } catch (erreur) {
+    const message = erreur instanceof Error ? erreur.message : "Erreur inattendue pendant l'import.";
+    return NextResponse.json({ erreur: message }, { status: 500 });
+  }
 }

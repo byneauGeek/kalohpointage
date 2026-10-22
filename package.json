@@ -28,13 +28,13 @@
     "@electric-sql/pglite-socket": "^0.2",
     "@prisma/client": "^6",
     "docx": "^9",
-    "exceljs": "^4",
     "framer-motion": "^14",
     "jose": "^6",
     "lucide-react": "^1",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "xlsx": "^0.18.5",
     "zod": "^4"
   },
   "devDependencies": {
