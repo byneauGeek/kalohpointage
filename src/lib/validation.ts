@@ -34,47 +34,57 @@ type Regle = {
   sensArrondi: "PLUS_PROCHE" | "INFERIEUR" | "SUPERIEUR";
 };
 
+// Nombre d'updates envoyes en parallele a la fois - un aller-retour reseau
+// par cours a traiter serait, en sequence, aussi lent que la generation de
+// cours avant son correctif (voir src/lib/coursEngine.ts) des que plusieurs
+// centaines de cours sont en attente de validation. Le calcul par cours
+// (tolerances, arrondi) reste en JS - seule l'ecriture est parallelisee,
+// par lots, pour rester sous le delai d'execution d'une fonction serverless
+// sans reimplementer la logique metier en SQL.
+const CONCURRENCE_ECRITURE = 25;
+
 export async function appliquerReglesValidation(regle: Regle) {
   const aTraiter = await prisma.cours.findMany({ where: { statut: "FIN_ENREGISTREE" } });
   let nbValides = 0;
   let nbAControler = 0;
 
-  for (const c of aTraiter) {
-    if (!c.heureArriveeReelle || !c.heureFinReelle) continue;
-    const prevueDebut = combinerDateEtMinutes(c.dateCours, c.heureDebutPrevueMin);
-    const prevueFin = combinerDateEtMinutes(c.dateCours, c.heureFinPrevueMin);
-    const ecartArrivee = minutesEntre(prevueDebut, c.heureArriveeReelle); // +retard
-    const ecartDepart = minutesEntre(prevueFin, c.heureFinReelle); // +parti tard, -parti tot
-    const dureeReelle = minutesEntre(c.heureArriveeReelle, c.heureFinReelle);
+  const ecritures = aTraiter
+    .filter((c) => c.heureArriveeReelle && c.heureFinReelle)
+    .map((c) => {
+      const prevueDebut = combinerDateEtMinutes(c.dateCours, c.heureDebutPrevueMin);
+      const prevueFin = combinerDateEtMinutes(c.dateCours, c.heureFinPrevueMin);
+      const ecartArrivee = minutesEntre(prevueDebut, c.heureArriveeReelle!); // +retard
+      const ecartDepart = minutesEntre(prevueFin, c.heureFinReelle!); // +parti tard, -parti tot
+      const dureeReelle = minutesEntre(c.heureArriveeReelle!, c.heureFinReelle!);
+      const dansLesTolerances =
+        ecartArrivee <= regle.toleranceArriveeMin && Math.abs(ecartDepart) <= regle.toleranceDepartMin;
 
-    const dansLesTolerances =
-      ecartArrivee <= regle.toleranceArriveeMin && Math.abs(ecartDepart) <= regle.toleranceDepartMin;
+      if (dansLesTolerances) nbValides++;
+      else nbAControler++;
 
-    if (dansLesTolerances) {
-      await prisma.cours.update({
-        where: { id: c.id },
-        data: {
-          ecartArriveeMin: ecartArrivee,
-          ecartDepartMin: ecartDepart,
-          dureeReelleMin: dureeReelle,
-          dureeValideeMin: arrondirMinutes(c.dureePrevueMin, regle.arrondiMin, regle.sensArrondi),
-          statut: "VALIDE",
-          dateValidation: new Date(),
-        },
-      });
-      nbValides++;
-    } else {
-      await prisma.cours.update({
-        where: { id: c.id },
-        data: {
-          ecartArriveeMin: ecartArrivee,
-          ecartDepartMin: ecartDepart,
-          dureeReelleMin: dureeReelle,
-          statut: "A_CONTROLER",
-        },
-      });
-      nbAControler++;
-    }
+      return () =>
+        prisma.cours.update({
+          where: { id: c.id },
+          data: dansLesTolerances
+            ? {
+                ecartArriveeMin: ecartArrivee,
+                ecartDepartMin: ecartDepart,
+                dureeReelleMin: dureeReelle,
+                dureeValideeMin: arrondirMinutes(c.dureePrevueMin, regle.arrondiMin, regle.sensArrondi),
+                statut: "VALIDE",
+                dateValidation: new Date(),
+              }
+            : {
+                ecartArriveeMin: ecartArrivee,
+                ecartDepartMin: ecartDepart,
+                dureeReelleMin: dureeReelle,
+                statut: "A_CONTROLER",
+              },
+        });
+    });
+
+  for (let i = 0; i < ecritures.length; i += CONCURRENCE_ECRITURE) {
+    await Promise.all(ecritures.slice(i, i + CONCURRENCE_ECRITURE).map((ecrire) => ecrire()));
   }
 
   return { nbValides, nbAControler };

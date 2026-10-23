@@ -4,6 +4,17 @@
  * les jours non ouvres. Idempotent : repose sur la contrainte unique
  * (professeurId, dateCours, heureDebutPrevueMin) - relancer sur la meme
  * periode ne duplique jamais rien (voir Journal_Decisions.md D08/D29).
+ *
+ * Implemente en UNE requete SQL brute (generate_series + jointure + INSERT
+ * ... ON CONFLICT DO NOTHING) plutot qu'une boucle JS avec un aller-retour
+ * reseau par occurrence : sur un emploi du temps reel (plusieurs dizaines de
+ * professeurs, annee scolaire complete), ca representait plusieurs milliers
+ * d'allers-retours sequentiels vers Neon - largement au-dela du delai
+ * d'execution d'une fonction serverless Netlify (constate en production,
+ * y compris apres un premier correctif par lots qui restait trop lent).
+ * Laisser Postgres faire la generation de dates ET la jointure cote serveur
+ * est a la fois plus correct et plus rapide qu'envoyer des milliers de
+ * lignes construites cote application.
  */
 import { prisma } from "@/lib/db";
 
@@ -11,85 +22,37 @@ function dateSeuleUTC(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
 
-function jourSemaineISO(d: Date): number {
-  const js = d.getUTCDay(); // 0=dimanche..6=samedi
-  return js === 0 ? 7 : js; // 1=lundi..7=dimanche, comme l'emploi du temps
-}
-
 export async function genererCoursPeriode(dateDebut: Date, dateFin: Date) {
   const debut = dateSeuleUTC(dateDebut);
   const fin = dateSeuleUTC(dateFin);
 
-  const joursNonOuvres = await prisma.jourNonOuvre.findMany({
-    where: { dateJour: { gte: debut, lte: fin } },
-  });
-  const joursNonOuvresSet = new Set(joursNonOuvres.map((j) => j.dateJour.toISOString().slice(0, 10)));
+  const [{ total }] = await prisma.$queryRaw<{ total: bigint }[]>`
+    SELECT COUNT(*)::bigint AS total
+    FROM generate_series(${debut}::timestamp, ${fin}::timestamp, interval '1 day') AS j
+    JOIN "emplois_du_temps" e
+      ON e."actif" = true
+      AND e."jourSemaine" = EXTRACT(ISODOW FROM j)
+      AND e."dateDebutValidite" <= j
+      AND (e."dateFinValidite" IS NULL OR e."dateFinValidite" >= j)
+    WHERE j::date NOT IN (
+      SELECT "dateJour"::date FROM "jours_non_ouvres" WHERE "dateJour" BETWEEN ${debut}::timestamp AND ${fin}::timestamp
+    )
+  `;
 
-  const emplois = await prisma.emploiDuTemps.findMany({
-    where: {
-      actif: true,
-      dateDebutValidite: { lte: fin },
-      OR: [{ dateFinValidite: null }, { dateFinValidite: { gte: debut } }],
-    },
-  });
+  const nbCrees = await prisma.$executeRaw`
+    INSERT INTO "cours" ("emploiDuTempsId", "professeurId", "classeId", "matiereId", "dateCours", "heureDebutPrevueMin", "heureFinPrevueMin", "dureePrevueMin")
+    SELECT e."id", e."professeurId", e."classeId", e."matiereId", j::date, e."heureDebutMin", e."heureFinMin", e."heureFinMin" - e."heureDebutMin"
+    FROM generate_series(${debut}::timestamp, ${fin}::timestamp, interval '1 day') AS j
+    JOIN "emplois_du_temps" e
+      ON e."actif" = true
+      AND e."jourSemaine" = EXTRACT(ISODOW FROM j)
+      AND e."dateDebutValidite" <= j
+      AND (e."dateFinValidite" IS NULL OR e."dateFinValidite" >= j)
+    WHERE j::date NOT IN (
+      SELECT "dateJour"::date FROM "jours_non_ouvres" WHERE "dateJour" BETWEEN ${debut}::timestamp AND ${fin}::timestamp
+    )
+    ON CONFLICT ("professeurId", "dateCours", "heureDebutPrevueMin") DO NOTHING
+  `;
 
-  // Construit TOUTES les lignes candidates d'abord, puis les insere par lots
-  // via createMany/skipDuplicates (une seule requete par lot) plutot qu'un
-  // create() individuel par occurrence : sur une periode de plusieurs
-  // semaines avec plusieurs professeurs, des centaines d'allers-retours
-  // reseau sequentiels vers la base depassent le delai d'une fonction
-  // serverless (observe en production). skipDuplicates s'appuie sur la
-  // contrainte unique (professeurId, dateCours, heureDebutPrevueMin) pour
-  // l'idempotence - memes garanties qu'avant, sans avaler silencieusement
-  // une erreur qui ne serait pas un simple doublon.
-  const lignes: {
-    emploiDuTempsId: number;
-    professeurId: number;
-    classeId: number;
-    matiereId: number;
-    dateCours: Date;
-    heureDebutPrevueMin: number;
-    heureFinPrevueMin: number;
-    dureePrevueMin: number;
-  }[] = [];
-
-  for (let d = new Date(debut); d <= fin; d.setUTCDate(d.getUTCDate() + 1)) {
-    const jourCourant = new Date(d);
-    const cle = jourCourant.toISOString().slice(0, 10);
-    if (joursNonOuvresSet.has(cle)) continue;
-
-    const jsISO = jourSemaineISO(jourCourant);
-    for (const emploi of emplois) {
-      if (emploi.jourSemaine !== jsISO) continue;
-      if (jourCourant < dateSeuleUTC(emploi.dateDebutValidite)) continue;
-      if (emploi.dateFinValidite && jourCourant > dateSeuleUTC(emploi.dateFinValidite)) continue;
-
-      lignes.push({
-        emploiDuTempsId: emploi.id,
-        professeurId: emploi.professeurId,
-        classeId: emploi.classeId,
-        matiereId: emploi.matiereId,
-        dateCours: jourCourant,
-        heureDebutPrevueMin: emploi.heureDebutMin,
-        heureFinPrevueMin: emploi.heureFinMin,
-        dureePrevueMin: emploi.heureFinMin - emploi.heureDebutMin,
-      });
-    }
-  }
-
-  // Sous la limite de parametres liants de PostgreSQL (65535 / 8 colonnes
-  // par ligne ~= 8191) : un lot large minimise le nombre d'allers-retours
-  // reseau, qui domine largement le temps total face a une base distante
-  // (Neon) - une seule requete pour une periode d'une annee scolaire
-  // complete avec plusieurs dizaines de professeurs reste possible.
-  const TAILLE_LOT = 8000;
-  let nbCrees = 0;
-  for (let i = 0; i < lignes.length; i += TAILLE_LOT) {
-    const lot = lignes.slice(i, i + TAILLE_LOT);
-    const resultat = await prisma.cours.createMany({ data: lot, skipDuplicates: true });
-    nbCrees += resultat.count;
-  }
-  const nbIgnores = lignes.length - nbCrees;
-
-  return { nbCrees, nbIgnores };
+  return { nbCrees, nbIgnores: Number(total) - nbCrees };
 }

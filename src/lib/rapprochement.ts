@@ -4,39 +4,31 @@
  * mdl_Validation / validation.ts). PLANIFIE -> ABSENT si pas d'arrivee passe
  * le delai configure ; ARRIVEE_ENREGISTREE/EN_COURS -> INCOMPLET si l'heure de
  * fin prevue est passee sans pointage de fin.
+ *
+ * Deux UPDATE en masse (un par transition) plutot qu'une boucle JS avec un
+ * update() individuel par cours concerne : sur un emploi du temps genere
+ * pour une annee scolaire complete, des milliers de cours peuvent etre
+ * PLANIFIE a la fois, meme risque de depassement du delai d'execution d'une
+ * fonction serverless que la generation de cours (voir src/lib/coursEngine.ts).
  */
 import { prisma } from "@/lib/db";
 
-function combinerDateEtMinutes(dateCours: Date, minutes: number): Date {
-  const d = new Date(dateCours);
-  d.setUTCMinutes(d.getUTCMinutes() + minutes);
-  return d;
-}
-
 export async function effectuerRapprochement(regle: { delaiAbsenceMin: number }) {
-  const maintenant = new Date();
-  let nbAbsents = 0;
-  let nbIncomplets = 0;
+  const nbAbsents = await prisma.$executeRaw`
+    UPDATE "cours"
+    SET "statut" = 'ABSENT'
+    WHERE "statut" = 'PLANIFIE'
+      AND "heureArriveeReelle" IS NULL
+      AND "dateCours" + (("heureDebutPrevueMin" + ${regle.delaiAbsenceMin}) * interval '1 minute') < now()
+  `;
 
-  const planifies = await prisma.cours.findMany({ where: { statut: "PLANIFIE" } });
-  for (const c of planifies) {
-    const limiteAbsence = combinerDateEtMinutes(c.dateCours, c.heureDebutPrevueMin + regle.delaiAbsenceMin);
-    if (maintenant > limiteAbsence && !c.heureArriveeReelle) {
-      await prisma.cours.update({ where: { id: c.id }, data: { statut: "ABSENT" } });
-      nbAbsents++;
-    }
-  }
-
-  const enCours = await prisma.cours.findMany({
-    where: { statut: { in: ["ARRIVEE_ENREGISTREE", "EN_COURS"] } },
-  });
-  for (const c of enCours) {
-    const finPrevue = combinerDateEtMinutes(c.dateCours, c.heureFinPrevueMin);
-    if (maintenant > finPrevue && !c.heureFinReelle) {
-      await prisma.cours.update({ where: { id: c.id }, data: { statut: "INCOMPLET" } });
-      nbIncomplets++;
-    }
-  }
+  const nbIncomplets = await prisma.$executeRaw`
+    UPDATE "cours"
+    SET "statut" = 'INCOMPLET'
+    WHERE "statut" IN ('ARRIVEE_ENREGISTREE', 'EN_COURS')
+      AND "heureFinReelle" IS NULL
+      AND "dateCours" + ("heureFinPrevueMin" * interval '1 minute') < now()
+  `;
 
   return { nbAbsents, nbIncomplets };
 }
