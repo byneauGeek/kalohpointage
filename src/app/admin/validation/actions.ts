@@ -1,9 +1,11 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { exigerRole } from "@/lib/auth";
 import { appliquerReglesValidation, traiterAnomalie } from "@/lib/validation";
 import { enregistrerAudit } from "@/lib/audit";
+import { notifierAnomaliesATraiter } from "@/lib/notifications";
 
 export async function appliquerReglesAction() {
   const session = await exigerRole(["ADMIN"]);
@@ -16,6 +18,11 @@ export async function appliquerReglesAction() {
     action: "APPLICATION_REGLES_VALIDATION",
     motif: `${resultat.nbValides} valides, ${resultat.nbAControler} a controler`,
   });
+
+  const enTetes = await headers();
+  const origine = `${enTetes.get("x-forwarded-proto") ?? "https"}://${enTetes.get("host") ?? ""}`;
+  await notifierAnomaliesATraiter(resultat.nbAControler, origine);
+
   revalidatePath("/admin/validation");
 }
 

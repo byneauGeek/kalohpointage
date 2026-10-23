@@ -65,13 +65,22 @@ export default async function PageComptabilisation({
                 <Td className="font-semibold text-[var(--color-navy-900)]">{l.montant.toFixed(2)}</Td>
                 <Td>
                   {periodeChoisie && (
-                    <a
-                      href={`/api/admin/fiche-paie?professeurId=${l.professeurId}&periodeId=${periodeChoisie.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-navy-800)] hover:underline"
-                    >
-                      <FileDown size={14} />
-                      Fiche (Word)
-                    </a>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={`/api/admin/fiche-paie?professeurId=${l.professeurId}&periodeId=${periodeChoisie.id}`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-navy-800)] hover:underline"
+                      >
+                        <FileDown size={14} />
+                        Word
+                      </a>
+                      <a
+                        href={`/api/admin/fiche-paie?professeurId=${l.professeurId}&periodeId=${periodeChoisie.id}&format=pdf`}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-navy-800)] hover:underline"
+                      >
+                        <FileDown size={14} />
+                        PDF
+                      </a>
+                    </div>
                   )}
                 </Td>
               </Tr>

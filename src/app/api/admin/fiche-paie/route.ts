@@ -3,6 +3,7 @@ import { lireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { calculerComptabilisation, detailSessionsProfesseur } from "@/lib/comptabilisation";
 import { genererFicheDePaieDocx } from "@/lib/ficheDePaie";
+import { genererFicheDePaiePdf } from "@/lib/ficheDePaiePdf";
 
 export async function GET(request: Request) {
   const session = await lireSession();
@@ -28,8 +29,21 @@ export async function GET(request: Request) {
 
   const { sessions, parMatiere } = await detailSessionsProfesseur(professeurId, periode.dateDebut, periode.dateFin);
 
-  const buffer = await genererFicheDePaieDocx({ nomEtablissement, periodeLibelle: periode.libelle, ligne, sessions, parMatiere });
+  const format = searchParams.get("format") === "pdf" ? "pdf" : "docx";
+  const donnees = { nomEtablissement, periodeLibelle: periode.libelle, ligne, sessions, parMatiere };
 
+  if (format === "pdf") {
+    const buffer = await genererFicheDePaiePdf(donnees);
+    const nomFichier = `Fiche_Paie_${ligne.matricule}_${periode.libelle}.pdf`;
+    return new NextResponse(buffer as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${nomFichier}"`,
+      },
+    });
+  }
+
+  const buffer = await genererFicheDePaieDocx(donnees);
   const nomFichier = `Fiche_Paie_${ligne.matricule}_${periode.libelle}.docx`;
   return new NextResponse(buffer as unknown as BodyInit, {
     headers: {

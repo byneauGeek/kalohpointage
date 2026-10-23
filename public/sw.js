@@ -7,8 +7,8 @@
  * fingerprintes) beneficie d'une strategie de cache, pour que le poste de
  * pointage recharge vite et reste utilisable lors d'un reseau instable.
  */
-const CACHE_VERSION = "kaloh-v1";
-const SHELL_URLS = ["/", "/pointage", "/login"];
+const CACHE_VERSION = "kaloh-v2";
+const SHELL_URLS = ["/", "/pointage", "/login", "/offline.html"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -58,7 +58,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_VERSION).then((cache) => cache.put(request, reponse.clone()));
           return reponse;
         })
-        .catch(() => caches.match(request).then((r) => r ?? caches.match("/")))
+        .catch(() => caches.match(request).then((r) => r ?? caches.match("/offline.html")))
     );
   }
 });

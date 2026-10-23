@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hors ligne — Collège Privé Kaloh</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #F4F6FB;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 24px;
+  }
+  .carte {
+    max-width: 380px;
+    width: 100%;
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(11,27,56,0.08), 0 8px 24px rgba(11,27,56,0.06);
+  }
+  .blason {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    border-radius: 999px;
+    background: #0B1B38;
+    color: #E8B84B;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+  }
+  h1 { font-size: 15px; font-weight: 600; color: #0B1B38; margin: 0 0 8px; }
+  p { font-size: 13px; color: rgba(11,27,56,0.6); line-height: 1.5; margin: 0 0 24px; }
+  button {
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 16px;
+    background: #E8B84B;
+    color: #0B1B38;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:hover { background: #D9A732; }
+</style>
+</head>
+<body>
+  <div class="carte">
+    <div class="blason">CPK</div>
+    <h1>Vous êtes hors ligne</h1>
+    <p>Impossible de contacter le serveur du Collège Privé Kaloh. Vérifiez votre connexion réseau puis réessayez — vos pointages ne doivent jamais être enregistrés sans connexion.</p>
+    <button onclick="location.reload()">Réessayer</button>
+  </div>
+</body>
+</html>

@@ -1,17 +1,28 @@
-import { Save, Settings } from "lucide-react";
+import { Save, Settings, CalendarPlus } from "lucide-react";
 import { exigerRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { enregistrerRegleValidation, enregistrerNomEtablissement } from "./actions";
+import { enregistrerRegleValidation, enregistrerNomEtablissement, cloturerAnneeScolaire } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Input, Select, Label } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 
-export default async function PageParametres() {
+const MESSAGES_ERREUR: Record<string, string> = {
+  confirmation: 'Clôture annulée : vous devez taper exactement "CONFIRMER".',
+  date: "Date de rentrée invalide.",
+};
+
+export default async function PageParametres({
+  searchParams,
+}: {
+  searchParams: Promise<{ erreur?: string; succes?: string }>;
+}) {
   await exigerRole(["ADMIN"]);
+  const { erreur, succes } = await searchParams;
   const regle = await prisma.regleValidation.findFirst({ where: { actif: true }, orderBy: { dateApplication: "desc" } });
   const nomEtablissement = await prisma.parametre.findUnique({ where: { cle: "NOM_ETABLISSEMENT" } });
+  const creneauxOuverts = await prisma.emploiDuTemps.count({ where: { actif: true, dateFinValidite: null } });
 
   return (
     <div>
@@ -73,6 +84,43 @@ export default async function PageParametres() {
                 Enregistrer les règles
               </Button>
             </div>
+          </form>
+        </Card>
+      </Reveal>
+
+      <Reveal delay={0.16}>
+        <Card className="mt-8 max-w-xl">
+          <CardTitle>Rentrée scolaire</CardTitle>
+          <p className="mb-4 text-sm text-[var(--color-navy-900)]/55">
+            Clôture l&apos;emploi du temps actuel ({creneauxOuverts} créneau{creneauxOuverts > 1 ? "x" : ""} sans date
+            de fin) à la veille de la date choisie. Les créneaux ne sont pas supprimés, seulement archivés : un
+            nouvel import pour la nouvelle année ne les chevauchera plus.
+          </p>
+
+          {succes === "cloture" && (
+            <p className="mb-4 rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+              Emploi du temps clôturé avec succès.
+            </p>
+          )}
+          {erreur && MESSAGES_ERREUR[erreur] && (
+            <p className="mb-4 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+              {MESSAGES_ERREUR[erreur]}
+            </p>
+          )}
+
+          <form action={cloturerAnneeScolaire} className="flex flex-wrap items-end gap-2">
+            <div>
+              <Label>Date de la nouvelle rentrée</Label>
+              <Input name="dateRentree" type="date" required />
+            </div>
+            <div>
+              <Label>Tapez CONFIRMER</Label>
+              <Input name="confirmation" placeholder="CONFIRMER" required className="w-40" />
+            </div>
+            <Button type="submit" variant="outline" size="sm">
+              <CalendarPlus size={14} />
+              Clôturer l&apos;année en cours
+            </Button>
           </form>
         </Card>
       </Reveal>
