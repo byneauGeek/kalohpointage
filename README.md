@@ -195,15 +195,54 @@ Particularités métier ajoutées sur demande de l'établissement :
 
 ## Pistes d'amélioration restantes (non implémentées)
 
+Audit complet mené le 2026-10-23. Un point critique (brute-force sur la
+connexion admin/comptable) a été corrigé immédiatement ; le reste est classé
+par thème pour une priorisation future.
+
+**Sécurité**
+- **En-têtes de sécurité HTTP** (CSP, `X-Frame-Options`, `Referrer-Policy`...)
+  non configurés — Next.js applique ses protections par défaut mais rien de
+  personnalisé (`next.config.ts`).
+- **Taille de fichier non limitée** sur l'upload d'emploi du temps
+  (`/api/admin/import-emploi-du-temps`) — un fichier volumineux pourrait
+  consommer beaucoup de mémoire sur une fonction serverless.
+- **Pas de 2FA** sur les comptes Admin/Comptable.
+- **Rotation de `AUTH_SECRET`** : aucune procédure si le secret doit être
+  changé (invalide toutes les sessions en cours, à documenter).
+
+**Fiabilité**
+- **Pas de page d'erreur personnalisée** (`error.tsx`) : une erreur serveur
+  imprévue affiche l'écran par défaut de Next.js plutôt qu'un message clair
+  pour l'utilisateur.
+- **Pas de page hors-ligne PWA** : le service worker est volontairement
+  prudent (réseau d'abord), mais rien n'est affiché si l'utilisateur perd la
+  connexion en plein pointage.
+- **Rétention/export de l'Audit** : aucune politique de purge ou d'export
+  périodique pour l'historique d'audit, qui grandit indéfiniment.
+
+**Produit / UX**
 - **Export PDF** des rapports officiels et de la fiche de paie (actuellement
   Word uniquement pour la fiche ; le rapport reste JSON canonique + table).
 - **Modifier un créneau d'emploi du temps** après import (aujourd'hui :
   import ou saisie initiale uniquement, pas d'édition ligne à ligne).
+- **Notifications** (email/SMS) à l'admin en cas d'anomalie de pointage ou
+  à l'approche d'une clôture de période — aujourd'hui tout est consulté
+  manuellement dans l'écran Validation.
+- **Rentrée scolaire / bascule d'année** : pas de notion explicite
+  d'année scolaire pour archiver/réinitialiser proprement d'une rentrée à
+  l'autre (les Périodes existent mais rien au niveau "année").
+
+**Exploitation**
 - **Limitation réseau** du poste de pointage (IP de l'établissement) et
   verrouillage d'écran navigateur dédié — mesure de déploiement, pas de code.
 - **Pagination** sur les tables qui peuvent grandir (Cours, Audit) —
   actuellement limitées à 100-200 lignes affichées ; la recherche existe
   déjà pour les Professeurs.
+- **Performance Netlify/Neon** : latence perceptible (deuxièmes près,
+  jusqu'à 4s à froid) propre à l'hébergement gratuit (fonctions serverless +
+  base qui se met en veille) — un plan Neon payant supprimerait la mise en
+  veille ; piste testée (driver serverless Neon) et abandonnée car elle
+  dégradait la situation au lieu de l'améliorer.
 - **Migration des données réelles** depuis `Heures_BE.accdb`.
 - **Tests automatisés** (le projet Access en avait ~180 ; aucun ici pour
   l'instant).
