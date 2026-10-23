@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { exigerRole } from "@/lib/auth";
 import { enregistrerAudit } from "@/lib/audit";
+import { genererJetonPointage } from "@/lib/jetonPointage";
 
 /** Les regles sont HISTORISEES par date d'application (jamais ecrasees) :
  * un cours utilise toujours la regle active a SA date, jamais la regle
@@ -94,4 +95,21 @@ export async function cloturerAnneeScolaire(formData: FormData) {
   revalidatePath("/admin/parametres");
   revalidatePath("/admin/emploi-du-temps");
   redirect("/admin/parametres?succes=cloture");
+}
+
+/** Genere un nouveau code d'acces au poste de pointage (24h) - rend
+ * immediatement caduc le precedent, meme non expire (voir
+ * src/lib/jetonPointage.ts). */
+export async function genererJetonPointageAction() {
+  const session = await exigerRole(["ADMIN"]);
+  const jeton = await genererJetonPointage(session.userId);
+
+  await enregistrerAudit({
+    utilisateurId: session.userId,
+    action: "GENERATION_JETON_POINTAGE",
+    tableConcernee: "jetons_pointage",
+    idEnregistrement: jeton.id,
+  });
+
+  revalidatePath("/admin/parametres");
 }

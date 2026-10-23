@@ -1,7 +1,8 @@
-import { Save, Settings, CalendarPlus } from "lucide-react";
+import { Save, Settings, CalendarPlus, KeyRound } from "lucide-react";
 import { exigerRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { enregistrerRegleValidation, enregistrerNomEtablissement, cloturerAnneeScolaire } from "./actions";
+import { enregistrerRegleValidation, enregistrerNomEtablissement, cloturerAnneeScolaire, genererJetonPointageAction } from "./actions";
+import { jetonActif, DUREE_JETON_HEURES } from "@/lib/jetonPointage";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Input, Select, Label } from "@/components/ui/Field";
@@ -23,6 +24,7 @@ export default async function PageParametres({
   const regle = await prisma.regleValidation.findFirst({ where: { actif: true }, orderBy: { dateApplication: "desc" } });
   const nomEtablissement = await prisma.parametre.findUnique({ where: { cle: "NOM_ETABLISSEMENT" } });
   const creneauxOuverts = await prisma.emploiDuTemps.count({ where: { actif: true, dateFinValidite: null } });
+  const jeton = await jetonActif();
 
   return (
     <div>
@@ -120,6 +122,38 @@ export default async function PageParametres({
             <Button type="submit" variant="outline" size="sm">
               <CalendarPlus size={14} />
               Clôturer l&apos;année en cours
+            </Button>
+          </form>
+        </Card>
+      </Reveal>
+
+      <Reveal delay={0.24}>
+        <Card className="mt-8 max-w-xl">
+          <CardTitle>Accès au poste de pointage</CardTitle>
+          <p className="mb-4 text-sm text-[var(--color-navy-900)]/55">
+            Code valable {DUREE_JETON_HEURES}h à communiquer aux postes autorisés à ouvrir l&apos;écran de pointage
+            (<code>/pointage</code>). Chaque appareil ne le saisit qu&apos;une fois : il reste ensuite reconnu
+            jusqu&apos;à l&apos;expiration de ce code, même s&apos;il est généré depuis un autre poste. Générer un
+            nouveau code invalide immédiatement l&apos;ancien.
+          </p>
+
+          {jeton ? (
+            <div className="mb-4 rounded-lg bg-[var(--color-navy-900)]/5 px-4 py-3">
+              <p className="font-mono text-2xl font-semibold tracking-[0.3em] text-[var(--color-navy-900)]">{jeton.code}</p>
+              <p className="mt-1 text-xs text-[var(--color-navy-900)]/50">
+                Expire le {jeton.expireLe.toLocaleString("fr-FR")}
+              </p>
+            </div>
+          ) : (
+            <p className="mb-4 rounded-lg bg-[var(--color-warning-bg)] px-3 py-2 text-sm text-[var(--color-warning)]">
+              Aucun code actif : l&apos;écran de pointage demandera un code à chaque nouvel appareil.
+            </p>
+          )}
+
+          <form action={genererJetonPointageAction}>
+            <Button type="submit" variant="outline" size="sm">
+              <KeyRound size={14} />
+              Générer un nouveau code
             </Button>
           </form>
         </Card>

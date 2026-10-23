@@ -76,6 +76,7 @@ model Utilisateur {
   periodesCloturees Periode[]  @relation("ClosePar")
   periodesReouvertes Periode[] @relation("RouvertePar")
   rapportsGeneres  Rapport[]
+  jetonsPointageGeneres JetonPointage[]
 
   @@map("utilisateurs")
 }
@@ -290,4 +291,22 @@ model Parametre {
   valeur String
 
   @@map("parametres")
+}
+
+/** Code quotidien (24h) protegeant l'acces au poste de pointage kiosque :
+ * genere depuis l'espace admin, il doit etre saisi une fois par appareil
+ * (voir src/lib/jetonPointage.ts - un cookie signe marque ensuite l'appareil
+ * comme "de confiance" jusqu'a l'expiration de CE jeton precis, pas
+ * jusqu'a sa propre date de validation). Seul le jeton le plus recent et
+ * non expire est valide - en generer un nouveau invalide immediatement
+ * le precedent, meme s'il n'avait pas encore expire. */
+model JetonPointage {
+  id           Int      @id @default(autoincrement())
+  code         String
+  genereLe     DateTime @default(now())
+  expireLe     DateTime
+  genereParId  Int
+  generePar    Utilisateur @relation(fields: [genereParId], references: [id])
+
+  @@map("jetons_pointage")
 }

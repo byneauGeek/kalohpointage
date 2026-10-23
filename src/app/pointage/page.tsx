@@ -12,13 +12,13 @@
  */
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Delete, CheckCircle2, LogIn, LogOut as LogOutIcon, Clock } from "lucide-react";
+import { Delete, CheckCircle2, LogIn, LogOut as LogOutIcon, Clock, ShieldCheck } from "lucide-react";
 import { Crest } from "@/components/brand/Crest";
 import { Button } from "@/components/ui/Button";
 
 type Professeur = { id: number; nom: string; prenom: string };
 type SessionInfo = { classe: string; matiere: string; heureDebutPrevueMin: number; heureFinPrevueMin: number };
-type Etape = "LISTE" | "PIN" | "ACTION" | "ATTENTE" | "CONFIRMATION";
+type Etape = "VERIFICATION" | "JETON" | "LISTE" | "PIN" | "ACTION" | "ATTENTE" | "CONFIRMATION";
 type Action = "ARRIVEE" | "FIN" | "ATTENTE_DEBUT" | "ATTENTE_FIN";
 
 function Horloge() {
@@ -68,7 +68,10 @@ const transitionEtape = {
 };
 
 export default function PagePointage() {
-  const [etape, setEtape] = useState<Etape>("LISTE");
+  const [etape, setEtape] = useState<Etape>("VERIFICATION");
+  const [codeAppareil, setCodeAppareil] = useState("");
+  const [erreurCode, setErreurCode] = useState<string | null>(null);
+  const [envoiCode, setEnvoiCode] = useState(false);
   const [professeurs, setProfesseurs] = useState<Professeur[]>([]);
   const [profSelectionne, setProfSelectionne] = useState<Professeur | null>(null);
   const [pin, setPin] = useState("");
@@ -82,6 +85,13 @@ export default function PagePointage() {
   const [echecsPin, setEchecsPin] = useState(0);
 
   useEffect(() => {
+    fetch("/api/pointage/jeton-appareil")
+      .then((r) => r.json())
+      .then((d) => setEtape(d.confiance ? "LISTE" : "JETON"))
+      .catch(() => setEtape("JETON"));
+  }, []);
+
+  useEffect(() => {
     if (etape === "LISTE") {
       fetch("/api/pointage/professeurs")
         .then((r) => r.json())
@@ -89,6 +99,24 @@ export default function PagePointage() {
         .catch(() => setProfesseurs([]));
     }
   }, [etape]);
+
+  async function validerCodeAppareil() {
+    setEnvoiCode(true);
+    setErreurCode(null);
+    const reponse = await fetch("/api/pointage/jeton-appareil", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: codeAppareil }),
+    });
+    const data = await reponse.json();
+    setEnvoiCode(false);
+    if (!reponse.ok) {
+      setErreurCode(data.erreur ?? "Code incorrect.");
+      return;
+    }
+    setCodeAppareil("");
+    setEtape("LISTE");
+  }
 
   function retourAccueil() {
     setEtape("LISTE");
@@ -192,6 +220,52 @@ export default function PagePointage() {
 
       <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-8 pb-16">
         <AnimatePresence mode="wait">
+          {etape === "JETON" && (
+            <motion.div key="jeton" {...transitionEtape} className="flex w-full max-w-sm flex-col items-center text-center">
+              <ShieldCheck size={44} className="text-[var(--color-gold-400)]" />
+              <h1 className="mt-4 font-display text-2xl font-semibold">Accès au poste de pointage</h1>
+              <p className="mb-6 mt-2 text-sm text-white/50">
+                Saisissez le code du jour fourni par l&apos;administration. Cet appareil n&apos;aura plus besoin de le
+                ressaisir avant son expiration.
+              </p>
+
+              <input
+                autoFocus
+                inputMode="numeric"
+                maxLength={6}
+                value={codeAppareil}
+                onChange={(e) => {
+                  setCodeAppareil(e.target.value.replace(/\D/g, ""));
+                  setErreurCode(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && codeAppareil.length > 0 && !envoiCode) validerCodeAppareil();
+                }}
+                placeholder="------"
+                className="mb-4 w-48 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-center font-mono text-2xl tracking-[0.4em] text-white placeholder:text-white/20 focus:border-[var(--color-gold-400)]/60 focus:outline-none"
+              />
+
+              {erreurCode && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1, x: [0, -6, 6, -4, 4, 0] }}
+                  className="mb-4 text-sm text-red-400"
+                >
+                  {erreurCode}
+                </motion.p>
+              )}
+
+              <Button
+                variant="gold"
+                onClick={validerCodeAppareil}
+                disabled={envoiCode || codeAppareil.length === 0}
+                className="w-48"
+              >
+                Valider
+              </Button>
+            </motion.div>
+          )}
+
           {etape === "LISTE" && (
             <motion.div key="liste" {...transitionEtape} className="flex w-full max-w-4xl flex-col items-center">
               <h1 className="mb-8 font-display text-3xl font-semibold">Sélectionnez votre nom</h1>
