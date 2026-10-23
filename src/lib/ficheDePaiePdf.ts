@@ -12,7 +12,7 @@
  * la page (bug constate et corrige lors de la premiere version).
  */
 import PDFDocument from "pdfkit";
-import type { LigneComptabilisation, SessionDetail, DetailParMatiere } from "@/lib/comptabilisation";
+import type { LigneComptabilisation, SessionDetail, DetailParMatiere, SaisieManuelleDetail } from "@/lib/comptabilisation";
 
 const JOURS = ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const NAVY = "#0B1B38";
@@ -35,8 +35,9 @@ export async function genererFicheDePaiePdf(params: {
   ligne: LigneComptabilisation;
   sessions: SessionDetail[];
   parMatiere: DetailParMatiere[];
+  manuelles: SaisieManuelleDetail[];
 }): Promise<Buffer> {
-  const { nomEtablissement, periodeLibelle, ligne, sessions, parMatiere } = params;
+  const { nomEtablissement, periodeLibelle, ligne, sessions, parMatiere, manuelles } = params;
   const reference = referenceFiche(ligne.matricule, periodeLibelle);
 
   return new Promise((resolve, reject) => {
@@ -121,6 +122,19 @@ export async function genererFicheDePaiePdf(params: {
       y += 14;
     }
     y += 10;
+
+    if (manuelles.length > 0) {
+      sauterPageSiNecessaire(30);
+      doc.fontSize(12).fillColor(NAVY).font("Helvetica-Bold").text("Heures saisies manuellement", xMarge, y);
+      y += 18;
+      doc.fontSize(9).font("Helvetica-Oblique").fillColor("#000000");
+      for (const m of manuelles) {
+        sauterPageSiNecessaire(14);
+        doc.text(`${formatHeures(m.heuresMin)} — ${m.motif}`, xMarge, y, { width: largeurPage });
+        y += 14;
+      }
+      y += 10;
+    }
 
     // Encadre recapitulatif remuneration
     sauterPageSiNecessaire(30);

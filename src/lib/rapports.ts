@@ -59,7 +59,7 @@ export async function genererRapport(params: {
     ? Number(periode.tauxHoraireApplique)
     : Number(regleActive?.tauxHoraireGeneral ?? 0);
 
-  const lignes = await calculerComptabilisation(periode.dateDebut, periode.dateFin, tauxApplique);
+  const lignes = await calculerComptabilisation(periode.dateDebut, periode.dateFin, tauxApplique, periode.id);
   const snapshot = construireSnapshotCanonique(periode.libelle, lignes);
   const hash = sha256Hex(snapshot);
   const codeVerification = genererCodeVerification();

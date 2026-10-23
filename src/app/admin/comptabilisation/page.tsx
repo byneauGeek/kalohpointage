@@ -23,7 +23,7 @@ export default async function PageComptabilisation({
     : Number(regle?.tauxHoraireGeneral ?? 0);
 
   const lignes = periodeChoisie
-    ? await calculerComptabilisation(periodeChoisie.dateDebut, periodeChoisie.dateFin, taux)
+    ? await calculerComptabilisation(periodeChoisie.dateDebut, periodeChoisie.dateFin, taux, periodeChoisie.id)
     : [];
 
   return (

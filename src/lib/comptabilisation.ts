@@ -27,9 +27,22 @@ export type LigneComptabilisation = {
 export async function calculerComptabilisation(
   dateDebut: Date,
   dateFin: Date,
-  tauxHoraireGeneral: number
+  tauxHoraireGeneral: number,
+  periodeId?: number
 ): Promise<LigneComptabilisation[]> {
   const professeurs = await prisma.professeur.findMany({ where: { actif: true } });
+
+  // Heures saisies manuellement pour cette periode (rattrapage pre-mise en
+  // service, voir src/app/admin/heures-manuelles) - regroupees par
+  // professeur pour un ajout simple aux minutes automatiques ci-dessous.
+  const minutesManuellesParProf = new Map<number, number>();
+  if (periodeId) {
+    const saisies = await prisma.saisieHeuresManuelle.findMany({ where: { periodeId } });
+    for (const s of saisies) {
+      minutesManuellesParProf.set(s.professeurId, (minutesManuellesParProf.get(s.professeurId) ?? 0) + s.heuresMin);
+    }
+  }
+
   const lignes: LigneComptabilisation[] = [];
 
   for (const prof of professeurs) {
@@ -41,8 +54,12 @@ export async function calculerComptabilisation(
       },
       select: { dureeValideeMin: true },
     });
-    const minutesValidees = coursValides.reduce((s, c) => s + (c.dureeValideeMin ?? 0), 0);
+    const minutesManuelles = minutesManuellesParProf.get(prof.id) ?? 0;
+    const minutesValidees = coursValides.reduce((s, c) => s + (c.dureeValideeMin ?? 0), 0) + minutesManuelles;
     const avertissements: string[] = [];
+    if (minutesManuelles > 0) {
+      avertissements.push(`Inclut ${(minutesManuelles / 60).toFixed(2)} h saisies manuellement.`);
+    }
 
     const taux = prof.tauxHoraireSpecifique ? Number(prof.tauxHoraireSpecifique) : tauxHoraireGeneral;
 
@@ -122,15 +139,21 @@ export type SessionDetail = {
 
 export type DetailParMatiere = { matiere: string; minutes: number };
 
+export type SaisieManuelleDetail = { motif: string; heuresMin: number; dateSaisie: Date };
+
 /** Detail session par session d'un professeur sur une periode - un
  * professeur peut enseigner plusieurs matieres (chaque creneau porte sa
  * propre matiere) : indispensable pour que la fiche de paie montre la
- * matiere de chaque session effectuee, pas seulement un total global. */
+ * matiere de chaque session effectuee, pas seulement un total global.
+ * Inclut aussi les heures saisies manuellement sur CETTE periode (voir
+ * calculerComptabilisation), listees separement : ce ne sont pas des
+ * sessions reelles avec une classe/matiere, juste un rattrapage global. */
 export async function detailSessionsProfesseur(
   professeurId: number,
   dateDebut: Date,
-  dateFin: Date
-): Promise<{ sessions: SessionDetail[]; parMatiere: DetailParMatiere[] }> {
+  dateFin: Date,
+  periodeId?: number
+): Promise<{ sessions: SessionDetail[]; parMatiere: DetailParMatiere[]; manuelles: SaisieManuelleDetail[] }> {
   const cours = await prisma.cours.findMany({
     where: { professeurId, statut: "VALIDE", dateCours: { gte: dateDebut, lte: dateFin } },
     include: { matiere: true, classe: true },
@@ -150,5 +173,14 @@ export async function detailSessionsProfesseur(
   }
   const parMatiere = Array.from(totauxParMatiere, ([matiere, minutes]) => ({ matiere, minutes }));
 
-  return { sessions, parMatiere };
+  const manuelles: SaisieManuelleDetail[] = periodeId
+    ? (
+        await prisma.saisieHeuresManuelle.findMany({
+          where: { professeurId, periodeId },
+          orderBy: { dateSaisie: "asc" },
+        })
+      ).map((s) => ({ motif: s.motif, heuresMin: s.heuresMin, dateSaisie: s.dateSaisie }))
+    : [];
+
+  return { sessions, parMatiere, manuelles };
 }

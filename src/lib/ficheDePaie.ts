@@ -22,7 +22,7 @@ import {
   ShadingType,
   Packer,
 } from "docx";
-import type { LigneComptabilisation, SessionDetail, DetailParMatiere } from "@/lib/comptabilisation";
+import type { LigneComptabilisation, SessionDetail, DetailParMatiere, SaisieManuelleDetail } from "@/lib/comptabilisation";
 
 const JOURS = ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 const COULEUR_NAVY = "0B1B38";
@@ -103,8 +103,9 @@ export async function genererFicheDePaieDocx(params: {
   ligne: LigneComptabilisation;
   sessions: SessionDetail[];
   parMatiere: DetailParMatiere[];
+  manuelles: SaisieManuelleDetail[];
 }): Promise<Buffer> {
-  const { nomEtablissement, periodeLibelle, ligne, sessions, parMatiere } = params;
+  const { nomEtablissement, periodeLibelle, ligne, sessions, parMatiere, manuelles } = params;
   const reference = referenceFiche(ligne.matricule, periodeLibelle);
 
   const lignesSessions = sessions.map(
@@ -199,6 +200,24 @@ export async function genererFicheDePaieDocx(params: {
                 children: [new TextRun({ text: `${m.matiere} : ${formatHeures(m.minutes)}` })],
               })
           ),
+
+          ...(manuelles.length > 0
+            ? [
+                new Paragraph({
+                  heading: HeadingLevel.HEADING_3,
+                  spacing: { before: 300, after: 100 },
+                  children: [new TextRun({ text: "Heures saisies manuellement", color: COULEUR_NAVY })],
+                }),
+                ...manuelles.map(
+                  (m) =>
+                    new Paragraph({
+                      children: [
+                        new TextRun({ text: `${formatHeures(m.heuresMin)} — ${m.motif}`, italics: true, size: 18 }),
+                      ],
+                    })
+                ),
+              ]
+            : []),
 
           // Encadre recapitulatif remuneration
           new Paragraph({

@@ -77,6 +77,7 @@ model Utilisateur {
   periodesReouvertes Periode[] @relation("RouvertePar")
   rapportsGeneres  Rapport[]
   jetonsPointageGeneres JetonPointage[]
+  saisiesHeuresManuelles SaisieHeuresManuelle[]
 
   @@map("utilisateurs")
 }
@@ -99,6 +100,7 @@ model Professeur {
   utilisateur    Utilisateur?
   emploisDuTemps EmploiDuTemps[]
   cours          Cours[]
+  saisiesManuelles SaisieHeuresManuelle[]
 
   @@map("professeurs")
 }
@@ -218,8 +220,33 @@ model Periode {
 
   cours   Cours[]
   rapports Rapport[]
+  saisiesManuelles SaisieHeuresManuelle[]
 
   @@map("periodes")
+}
+
+/** Heures saisies manuellement pour un professeur sur une periode - sert a
+ * rattraper des heures reellement effectuees mais jamais tracees par le
+ * systeme (typiquement : les semaines d'enseignement avant la mise en
+ * service de l'application, pour lesquelles aucun Cours n'a pu etre genere
+ * faute d'emploi du temps importe a l'epoque). S'ajoute aux minutes
+ * validees automatiquement (Cours.statut=VALIDE) dans le calcul des
+ * honoraires de la periode choisie - voir calculerComptabilisation. Motif
+ * obligatoire et auteur trace : memes garde-fous que toute correction
+ * manuelle de donnees dans l'application (D11). */
+model SaisieHeuresManuelle {
+  id           Int      @id @default(autoincrement())
+  professeur   Professeur @relation(fields: [professeurId], references: [id])
+  professeurId Int
+  periode      Periode  @relation(fields: [periodeId], references: [id])
+  periodeId    Int
+  heuresMin    Int      // minutes
+  motif        String
+  dateSaisie   DateTime @default(now())
+  saisiePar    Utilisateur @relation(fields: [saisieParId], references: [id])
+  saisieParId  Int
+
+  @@map("saisies_heures_manuelles")
 }
 
 model Rapport {
