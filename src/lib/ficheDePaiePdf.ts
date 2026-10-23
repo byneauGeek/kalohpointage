@@ -25,6 +25,10 @@ function formatHeures(min: number): string {
   return (min / 60).toFixed(2).replace(".", ",") + " h";
 }
 
+function formatHeureHorloge(min: number): string {
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}h${String(min % 60).padStart(2, "0")}`;
+}
+
 function referenceFiche(matricule: string, periodeLibelle: string): string {
   return `FP-${periodeLibelle}-${matricule}`;
 }
@@ -126,12 +130,44 @@ export async function genererFicheDePaiePdf(params: {
     if (manuelles.length > 0) {
       sauterPageSiNecessaire(30);
       doc.fontSize(12).fillColor(NAVY).font("Helvetica-Bold").text("Heures saisies manuellement", xMarge, y);
-      y += 18;
-      doc.fontSize(9).font("Helvetica-Oblique").fillColor("#000000");
+      y += 20;
+
+      const colonnesManuelles = [
+        { titre: "Date", largeur: 70 },
+        { titre: "Jour", largeur: 65 },
+        { titre: "Arrivée", largeur: 60 },
+        { titre: "Départ", largeur: 60 },
+        { titre: "Durée", largeur: 60 },
+        { titre: "Motif", largeur: largeurPage - 70 - 65 - 60 - 60 - 60 },
+      ];
+
+      function ligneTableauManuelles(valeurs: string[], gras: boolean, fond?: string) {
+        sauterPageSiNecessaire(18);
+        const hauteur = 18;
+        if (fond) doc.rect(xMarge, y, largeurPage, hauteur).fill(fond);
+        doc.font(gras ? "Helvetica-Bold" : "Helvetica").fontSize(9).fillColor(gras ? "#FFFFFF" : "#000000");
+        let x = xMarge;
+        valeurs.forEach((v, i) => {
+          doc.text(v, x + 4, y + 5, { width: colonnesManuelles[i].largeur - 8, lineBreak: false });
+          x += colonnesManuelles[i].largeur;
+        });
+        y += hauteur;
+      }
+
+      ligneTableauManuelles(colonnesManuelles.map((c) => c.titre), true, NAVY);
       for (const m of manuelles) {
-        sauterPageSiNecessaire(14);
-        doc.text(`${formatHeures(m.heuresMin)} — ${m.motif}`, xMarge, y, { width: largeurPage });
-        y += 14;
+        const jourTexte = JOURS[m.date.getUTCDay() === 0 ? 7 : m.date.getUTCDay()];
+        ligneTableauManuelles(
+          [
+            m.date.toISOString().slice(0, 10),
+            jourTexte,
+            formatHeureHorloge(m.heureArriveeMin),
+            formatHeureHorloge(m.heureDepartMin),
+            formatHeures(m.dureeMin),
+            m.motif,
+          ],
+          false
+        );
       }
       y += 10;
     }

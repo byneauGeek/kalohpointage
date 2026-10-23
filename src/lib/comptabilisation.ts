@@ -39,7 +39,7 @@ export async function calculerComptabilisation(
   if (periodeId) {
     const saisies = await prisma.saisieHeuresManuelle.findMany({ where: { periodeId } });
     for (const s of saisies) {
-      minutesManuellesParProf.set(s.professeurId, (minutesManuellesParProf.get(s.professeurId) ?? 0) + s.heuresMin);
+      minutesManuellesParProf.set(s.professeurId, (minutesManuellesParProf.get(s.professeurId) ?? 0) + s.dureeMin);
     }
   }
 
@@ -139,7 +139,13 @@ export type SessionDetail = {
 
 export type DetailParMatiere = { matiere: string; minutes: number };
 
-export type SaisieManuelleDetail = { motif: string; heuresMin: number; dateSaisie: Date };
+export type SaisieManuelleDetail = {
+  date: Date;
+  heureArriveeMin: number;
+  heureDepartMin: number;
+  dureeMin: number;
+  motif: string;
+};
 
 /** Detail session par session d'un professeur sur une periode - un
  * professeur peut enseigner plusieurs matieres (chaque creneau porte sa
@@ -177,9 +183,15 @@ export async function detailSessionsProfesseur(
     ? (
         await prisma.saisieHeuresManuelle.findMany({
           where: { professeurId, periodeId },
-          orderBy: { dateSaisie: "asc" },
+          orderBy: { date: "asc" },
         })
-      ).map((s) => ({ motif: s.motif, heuresMin: s.heuresMin, dateSaisie: s.dateSaisie }))
+      ).map((s) => ({
+        date: s.date,
+        heureArriveeMin: s.heureArriveeMin,
+        heureDepartMin: s.heureDepartMin,
+        dureeMin: s.dureeMin,
+        motif: s.motif,
+      }))
     : [];
 
   return { sessions, parMatiere, manuelles };

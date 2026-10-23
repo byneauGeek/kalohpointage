@@ -43,6 +43,10 @@ function formatHeures(min: number): string {
   return (min / 60).toFixed(2).replace(".", ",") + " h";
 }
 
+function formatHeureHorloge(min: number): string {
+  return `${String(Math.floor(min / 60)).padStart(2, "0")}h${String(min % 60).padStart(2, "0")}`;
+}
+
 /** Reference lisible et stable (idempotente pour un meme professeur/periode)
  * - pas une numerotation officielle au sens des Rapports (pas de hash, pas
  * d'historisation en base), juste un identifiant pour s'y retrouver sur un
@@ -208,14 +212,35 @@ export async function genererFicheDePaieDocx(params: {
                   spacing: { before: 300, after: 100 },
                   children: [new TextRun({ text: "Heures saisies manuellement", color: COULEUR_NAVY })],
                 }),
-                ...manuelles.map(
-                  (m) =>
-                    new Paragraph({
+                new Table({
+                  width: { size: 100, type: WidthType.PERCENTAGE },
+                  borders: BORDURES_TABLE,
+                  rows: [
+                    new TableRow({
                       children: [
-                        new TextRun({ text: `${formatHeures(m.heuresMin)} — ${m.motif}`, italics: true, size: 18 }),
+                        celluleEntete("Date", 14),
+                        celluleEntete("Jour", 12),
+                        celluleEntete("Arrivée", 12),
+                        celluleEntete("Départ", 12),
+                        celluleEntete("Durée", 12),
+                        celluleEntete("Motif", 38),
                       ],
-                    })
-                ),
+                    }),
+                    ...manuelles.map(
+                      (m) =>
+                        new TableRow({
+                          children: [
+                            cellule(m.date.toISOString().slice(0, 10), { largeur: 14 }),
+                            cellule(JOURS[m.date.getUTCDay() === 0 ? 7 : m.date.getUTCDay()], { largeur: 12 }),
+                            cellule(formatHeureHorloge(m.heureArriveeMin), { largeur: 12 }),
+                            cellule(formatHeureHorloge(m.heureDepartMin), { largeur: 12 }),
+                            cellule(formatHeures(m.dureeMin), { align: AlignmentType.RIGHT, largeur: 12 }),
+                            cellule(m.motif, { largeur: 38 }),
+                          ],
+                        })
+                    ),
+                  ],
+                }),
               ]
             : []),
 

@@ -229,22 +229,29 @@ model Periode {
  * rattraper des heures reellement effectuees mais jamais tracees par le
  * systeme (typiquement : les semaines d'enseignement avant la mise en
  * service de l'application, pour lesquelles aucun Cours n'a pu etre genere
- * faute d'emploi du temps importe a l'epoque). S'ajoute aux minutes
- * validees automatiquement (Cours.statut=VALIDE) dans le calcul des
- * honoraires de la periode choisie - voir calculerComptabilisation. Motif
- * obligatoire et auteur trace : memes garde-fous que toute correction
- * manuelle de donnees dans l'application (D11). */
+ * faute d'emploi du temps importe a l'epoque). Une ligne = un jour reel
+ * (date + heure d'arrivee + heure de depart, duree calculee) - comme un
+ * releve de pointage reconstitue a la main plutot qu'un total global, pour
+ * rester coherent avec la facon dont le reste de l'application raisonne
+ * (Cours.heureArriveeReelle/heureFinReelle). S'ajoute aux minutes validees
+ * automatiquement (Cours.statut=VALIDE) dans le calcul des honoraires de la
+ * periode choisie - voir calculerComptabilisation. Motif obligatoire et
+ * auteur trace : memes garde-fous que toute correction manuelle de donnees
+ * dans l'application (D11). */
 model SaisieHeuresManuelle {
-  id           Int      @id @default(autoincrement())
-  professeur   Professeur @relation(fields: [professeurId], references: [id])
-  professeurId Int
-  periode      Periode  @relation(fields: [periodeId], references: [id])
-  periodeId    Int
-  heuresMin    Int      // minutes
-  motif        String
-  dateSaisie   DateTime @default(now())
-  saisiePar    Utilisateur @relation(fields: [saisieParId], references: [id])
-  saisieParId  Int
+  id              Int      @id @default(autoincrement())
+  professeur      Professeur @relation(fields: [professeurId], references: [id])
+  professeurId    Int
+  periode         Periode  @relation(fields: [periodeId], references: [id])
+  periodeId       Int
+  date            DateTime // jour de la session (partie date seule)
+  heureArriveeMin Int      // minutes depuis minuit
+  heureDepartMin  Int      // minutes depuis minuit, > heureArriveeMin
+  dureeMin        Int      // heureDepartMin - heureArriveeMin
+  motif           String
+  dateSaisie      DateTime @default(now())
+  saisiePar       Utilisateur @relation(fields: [saisieParId], references: [id])
+  saisieParId     Int
 
   @@map("saisies_heures_manuelles")
 }
