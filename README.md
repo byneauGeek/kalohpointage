@@ -192,14 +192,31 @@ Particularités métier ajoutées sur demande de l'établissement :
   message d'échec de connexion.
 - **Fuseau horaire** documenté dans `.env.example` (`TZ`) avec l'explication
   de son impact sur le calcul de "aujourd'hui" côté pointage.
+- **Protection anti-brute-force** sur la connexion Admin/Comptable (5 échecs
+  → blocage 15 min, même principe que le PIN professeur).
+- **Pages d'erreur personnalisées** (`error.tsx` racine + admin).
+- **Page hors-ligne PWA** (`public/offline.html`), servie par le service
+  worker en dernier recours quand le réseau est indisponible.
+- **Export CSV + purge de l'Audit** (`/admin/audit`), purge protégée par
+  confirmation textuelle.
+- **Export PDF** de la fiche de paie et des rapports officiels (en plus du
+  Word existant pour la fiche), via `pdfkit`.
+- **Édition d'un créneau d'emploi du temps** après import.
+- **Clôture d'année scolaire** (`/admin/parametres`) pour archiver
+  proprement l'emploi du temps d'une rentrée à l'autre.
+- **Notification email** (Resend, facultative) quand l'application des
+  règles de validation laisse des cours à contrôler manuellement.
 
 ## Pistes d'amélioration restantes (non implémentées)
 
-Audit complet mené le 2026-10-23. Un point critique (brute-force sur la
-connexion admin/comptable) a été corrigé immédiatement ; le reste est classé
-par thème pour une priorisation future.
+Audit complet mené le 2026-10-23 ; 8 points corrigés le jour même (voir
+ci-dessus). Le reste est classé par thème pour une priorisation future.
 
 **Sécurité**
+- **Vulnérabilité connue dans `xlsx`** (pollution de prototype + ReDoS,
+  GHSA-4r6h-8v6p-xvw6 / GHSA-5pgg-2g8v-p4x9) sur les fichiers Excel importés
+  — exposition limitée (upload réservé à l'Admin authentifié) mais sans
+  correctif publié sur le registre npm à ce jour.
 - **En-têtes de sécurité HTTP** (CSP, `X-Frame-Options`, `Referrer-Policy`...)
   non configurés — Next.js applique ses protections par défaut mais rien de
   personnalisé (`next.config.ts`).
@@ -210,27 +227,11 @@ par thème pour une priorisation future.
 - **Rotation de `AUTH_SECRET`** : aucune procédure si le secret doit être
   changé (invalide toutes les sessions en cours, à documenter).
 
-**Fiabilité**
-- **Pas de page d'erreur personnalisée** (`error.tsx`) : une erreur serveur
-  imprévue affiche l'écran par défaut de Next.js plutôt qu'un message clair
-  pour l'utilisateur.
-- **Pas de page hors-ligne PWA** : le service worker est volontairement
-  prudent (réseau d'abord), mais rien n'est affiché si l'utilisateur perd la
-  connexion en plein pointage.
-- **Rétention/export de l'Audit** : aucune politique de purge ou d'export
-  périodique pour l'historique d'audit, qui grandit indéfiniment.
-
 **Produit / UX**
-- **Export PDF** des rapports officiels et de la fiche de paie (actuellement
-  Word uniquement pour la fiche ; le rapport reste JSON canonique + table).
-- **Modifier un créneau d'emploi du temps** après import (aujourd'hui :
-  import ou saisie initiale uniquement, pas d'édition ligne à ligne).
-- **Notifications** (email/SMS) à l'admin en cas d'anomalie de pointage ou
-  à l'approche d'une clôture de période — aujourd'hui tout est consulté
-  manuellement dans l'écran Validation.
-- **Rentrée scolaire / bascule d'année** : pas de notion explicite
-  d'année scolaire pour archiver/réinitialiser proprement d'une rentrée à
-  l'autre (les Périodes existent mais rien au niveau "année").
+- **Notifications SMS** à l'admin (l'email est implémenté ; le SMS demande
+  un fournisseur supplémentaire comme Twilio, non mis en place).
+- **Notification à l'approche d'une clôture de période** (la notification
+  email actuelle ne couvre que les anomalies de validation).
 
 **Exploitation**
 - **Limitation réseau** du poste de pointage (IP de l'établissement) et
