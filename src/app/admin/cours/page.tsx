@@ -1,11 +1,11 @@
-import { CalendarPlus, RefreshCcw } from "lucide-react";
+import { RefreshCcw } from "lucide-react";
 import { exigerRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatMinutes } from "@/lib/heureUtils";
-import { genererCoursAction, effectuerRapprochementAction } from "./actions";
+import { effectuerRapprochementAction } from "./actions";
+import GenererCoursForm from "./GenererCoursForm";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
-import { Input, Label } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { StatutBadge } from "@/components/ui/Badge";
 import { Table, Thead, Th, Tr, Td, EmptyState } from "@/components/ui/Table";
@@ -29,22 +29,7 @@ export default async function PageCours({ searchParams }: { searchParams: Promis
       {session.role === "ADMIN" && (
         <Reveal>
           <div className="mb-6 flex flex-wrap gap-4">
-            <Card padded className="flex items-end gap-2">
-              <form action={genererCoursAction} className="flex items-end gap-2">
-                <div>
-                  <Label>Du</Label>
-                  <Input type="date" name="dateDebut" required />
-                </div>
-                <div>
-                  <Label>Au</Label>
-                  <Input type="date" name="dateFin" required />
-                </div>
-                <Button type="submit">
-                  <CalendarPlus size={16} />
-                  Générer les cours
-                </Button>
-              </form>
-            </Card>
+            <GenererCoursForm />
 
             <Card padded className="flex items-end">
               <form action={effectuerRapprochementAction}>
