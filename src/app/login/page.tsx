@@ -4,6 +4,7 @@ import { BrandMark } from "@/components/brand/BrandMark";
 import { Card } from "@/components/ui/Card";
 import { Input, Label } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
+import { DELAI_BLOCAGE_CONNEXION_MIN } from "@/lib/verrouillageConnexion";
 
 export default async function PageLogin({
   searchParams,
@@ -26,6 +27,11 @@ export default async function PageLogin({
         {erreur === "1" && (
           <p className="mb-4 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
             Identifiant ou mot de passe incorrect.
+          </p>
+        )}
+        {erreur === "bloque" && (
+          <p className="mb-4 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+            Trop de tentatives incorrectes. Réessayez dans {DELAI_BLOCAGE_CONNEXION_MIN} minutes ou contactez un autre administrateur.
           </p>
         )}
         <form action={connecter}>
