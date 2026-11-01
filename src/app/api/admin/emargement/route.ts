@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { lireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { calculerComptabilisation, detailSessionsProfesseur } from "@/lib/comptabilisation";
+import { calculerComptabilisation, detailSessionsProfesseur, matieresEnseigneesProfesseur } from "@/lib/comptabilisation";
 import { genererEmargementPdf, type LigneEmargement } from "@/lib/emargementPdf";
 import { resoudreMoisCalendaire } from "@/lib/moisCalendaire";
 
@@ -28,11 +28,17 @@ export async function GET(request: Request) {
   const lignes: LigneEmargement[] = await Promise.all(
     lignesAvecHeures.map(async (l) => {
       const { parMatiere } = await detailSessionsProfesseur(l.professeurId, dateDebut, dateFin);
+      // Sessions validees d'abord (matiere exacte de chaque cours) ; a
+      // defaut (heures uniquement saisies manuellement, sans matiere
+      // propre), on retombe sur l'emploi du temps du professeur.
+      const matieres = parMatiere.length > 0
+        ? parMatiere.map((m) => m.matiere)
+        : await matieresEnseigneesProfesseur(l.professeurId, dateDebut, dateFin);
       return {
         matricule: l.matricule,
         nom: l.nom,
         prenom: l.prenom,
-        matieres: parMatiere.map((m) => m.matiere).join(", "),
+        matieres: matieres.join(", "),
         minutesValidees: l.minutesValidees,
         montant: l.montant,
       };

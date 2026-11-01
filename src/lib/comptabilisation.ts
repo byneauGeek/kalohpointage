@@ -201,3 +201,25 @@ export async function detailSessionsProfesseur(
 
   return { sessions, parMatiere, manuelles };
 }
+
+/** Matiere(s) qu'un professeur est cense enseigner sur une plage de dates,
+ * d'apres son emploi du temps actif (et non les Cours valides, qui peuvent
+ * etre absents quand les heures sont uniquement suivies via la saisie
+ * manuelle - voir src/app/admin/heures-manuelles, qui n'a pas de champ
+ * matiere) - utilisee par la fiche d'emargement pour afficher une matiere
+ * meme quand aucune session automatique n'a ete validee. Un creneau est
+ * retenu s'il etait actif a un moment de la plage (dateDebutValidite <=
+ * dateFin et, sans date de fin ou avec une date de fin posterieure a
+ * dateDebut). */
+export async function matieresEnseigneesProfesseur(professeurId: number, dateDebut: Date, dateFin: Date): Promise<string[]> {
+  const creneaux = await prisma.emploiDuTemps.findMany({
+    where: {
+      professeurId,
+      actif: true,
+      dateDebutValidite: { lte: dateFin },
+      OR: [{ dateFinValidite: null }, { dateFinValidite: { gte: dateDebut } }],
+    },
+    include: { matiere: true },
+  });
+  return Array.from(new Set(creneaux.map((c) => c.matiere.libelle)));
+}
