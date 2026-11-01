@@ -27,20 +27,20 @@ export type LigneComptabilisation = {
 export async function calculerComptabilisation(
   dateDebut: Date,
   dateFin: Date,
-  tauxHoraireGeneral: number,
-  periodeId?: number
+  tauxHoraireGeneral: number
 ): Promise<LigneComptabilisation[]> {
   const professeurs = await prisma.professeur.findMany({ where: { actif: true } });
 
-  // Heures saisies manuellement pour cette periode (rattrapage pre-mise en
-  // service, voir src/app/admin/heures-manuelles) - regroupees par
-  // professeur pour un ajout simple aux minutes automatiques ci-dessous.
+  // Heures saisies manuellement dont le jour (date) tombe dans la plage
+  // demandee (rattrapage pre-mise en service, voir
+  // src/app/admin/heures-manuelles) - regroupees par professeur pour un
+  // ajout simple aux minutes automatiques ci-dessous. Filtrees par date et
+  // non par periode : une Periode couvre toute l'annee scolaire, ce qui ne
+  // permet pas d'isoler un seul mois (rapport mensuel, fiche d'emargement).
   const minutesManuellesParProf = new Map<number, number>();
-  if (periodeId) {
-    const saisies = await prisma.saisieHeuresManuelle.findMany({ where: { periodeId } });
-    for (const s of saisies) {
-      minutesManuellesParProf.set(s.professeurId, (minutesManuellesParProf.get(s.professeurId) ?? 0) + s.dureeMin);
-    }
+  const saisies = await prisma.saisieHeuresManuelle.findMany({ where: { date: { gte: dateDebut, lte: dateFin } } });
+  for (const s of saisies) {
+    minutesManuellesParProf.set(s.professeurId, (minutesManuellesParProf.get(s.professeurId) ?? 0) + s.dureeMin);
   }
 
   const lignes: LigneComptabilisation[] = [];
@@ -147,18 +147,18 @@ export type SaisieManuelleDetail = {
   motif: string;
 };
 
-/** Detail session par session d'un professeur sur une periode - un
+/** Detail session par session d'un professeur sur une plage de dates - un
  * professeur peut enseigner plusieurs matieres (chaque creneau porte sa
  * propre matiere) : indispensable pour que la fiche de paie montre la
  * matiere de chaque session effectuee, pas seulement un total global.
- * Inclut aussi les heures saisies manuellement sur CETTE periode (voir
- * calculerComptabilisation), listees separement : ce ne sont pas des
- * sessions reelles avec une classe/matiere, juste un rattrapage global. */
+ * Inclut aussi les heures saisies manuellement dont le jour tombe dans
+ * cette plage (voir calculerComptabilisation), listees separement : ce ne
+ * sont pas des sessions reelles avec une classe/matiere, juste un
+ * rattrapage global. */
 export async function detailSessionsProfesseur(
   professeurId: number,
   dateDebut: Date,
-  dateFin: Date,
-  periodeId?: number
+  dateFin: Date
 ): Promise<{ sessions: SessionDetail[]; parMatiere: DetailParMatiere[]; manuelles: SaisieManuelleDetail[] }> {
   const cours = await prisma.cours.findMany({
     where: { professeurId, statut: "VALIDE", dateCours: { gte: dateDebut, lte: dateFin } },
@@ -179,20 +179,18 @@ export async function detailSessionsProfesseur(
   }
   const parMatiere = Array.from(totauxParMatiere, ([matiere, minutes]) => ({ matiere, minutes }));
 
-  const manuelles: SaisieManuelleDetail[] = periodeId
-    ? (
-        await prisma.saisieHeuresManuelle.findMany({
-          where: { professeurId, periodeId },
-          orderBy: { date: "asc" },
-        })
-      ).map((s) => ({
-        date: s.date,
-        heureArriveeMin: s.heureArriveeMin,
-        heureDepartMin: s.heureDepartMin,
-        dureeMin: s.dureeMin,
-        motif: s.motif,
-      }))
-    : [];
+  const manuelles: SaisieManuelleDetail[] = (
+    await prisma.saisieHeuresManuelle.findMany({
+      where: { professeurId, date: { gte: dateDebut, lte: dateFin } },
+      orderBy: { date: "asc" },
+    })
+  ).map((s) => ({
+    date: s.date,
+    heureArriveeMin: s.heureArriveeMin,
+    heureDepartMin: s.heureDepartMin,
+    dureeMin: s.dureeMin,
+    motif: s.motif,
+  }));
 
   return { sessions, parMatiere, manuelles };
 }

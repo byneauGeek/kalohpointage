@@ -23,11 +23,11 @@ export async function GET(request: Request) {
   const regle = await prisma.regleValidation.findFirst({ where: { actif: true }, orderBy: { dateApplication: "desc" } });
   const taux = periode.tauxHoraireApplique ? Number(periode.tauxHoraireApplique) : Number(regle?.tauxHoraireGeneral ?? 0);
 
-  const lignes = await calculerComptabilisation(periode.dateDebut, periode.dateFin, taux, periode.id);
+  const lignes = await calculerComptabilisation(periode.dateDebut, periode.dateFin, taux);
   const ligne = lignes.find((l) => l.professeurId === professeurId);
   if (!ligne) return NextResponse.json({ erreur: "Professeur sans donnees sur cette periode." }, { status: 404 });
 
-  const { sessions, parMatiere, manuelles } = await detailSessionsProfesseur(professeurId, periode.dateDebut, periode.dateFin, periode.id);
+  const { sessions, parMatiere, manuelles } = await detailSessionsProfesseur(professeurId, periode.dateDebut, periode.dateFin);
 
   const format = searchParams.get("format") === "pdf" ? "pdf" : "docx";
   const donnees = { nomEtablissement, periodeLibelle: periode.libelle, ligne, sessions, parMatiere, manuelles };
