@@ -27,18 +27,25 @@ export type LigneComptabilisation = {
 export async function calculerComptabilisation(
   dateDebut: Date,
   dateFin: Date,
-  tauxHoraireGeneral: number
+  tauxHoraireGeneral: number,
+  periodeId?: number
 ): Promise<LigneComptabilisation[]> {
   const professeurs = await prisma.professeur.findMany({ where: { actif: true } });
 
-  // Heures saisies manuellement dont le jour (date) tombe dans la plage
-  // demandee (rattrapage pre-mise en service, voir
+  // Heures saisies manuellement (rattrapage pre-mise en service, voir
   // src/app/admin/heures-manuelles) - regroupees par professeur pour un
-  // ajout simple aux minutes automatiques ci-dessous. Filtrees par date et
-  // non par periode : une Periode couvre toute l'annee scolaire, ce qui ne
-  // permet pas d'isoler un seul mois (rapport mensuel, fiche d'emargement).
+  // ajout simple aux minutes automatiques ci-dessous. Avec periodeId
+  // (comptabilisation par Periode / annee scolaire) : TOUTES les saisies de
+  // cette periode, quelle que soit leur date - une saisie de rattrapage est
+  // par construction souvent datee AVANT le debut officiel de la periode
+  // (ex. periode "26-27" ouverte le 23/10/2026, rattrapage pour des heures
+  // du 1er au 22/10). Sans periodeId (rapport mensuel, fiche d'emargement,
+  // qui raisonnent en mois calendaire et n'ont pas de Periode a cette
+  // granularite) : les saisies dont le jour tombe dans la plage demandee.
   const minutesManuellesParProf = new Map<number, number>();
-  const saisies = await prisma.saisieHeuresManuelle.findMany({ where: { date: { gte: dateDebut, lte: dateFin } } });
+  const saisies = await prisma.saisieHeuresManuelle.findMany({
+    where: periodeId ? { periodeId } : { date: { gte: dateDebut, lte: dateFin } },
+  });
   for (const s of saisies) {
     minutesManuellesParProf.set(s.professeurId, (minutesManuellesParProf.get(s.professeurId) ?? 0) + s.dureeMin);
   }
@@ -151,14 +158,14 @@ export type SaisieManuelleDetail = {
  * professeur peut enseigner plusieurs matieres (chaque creneau porte sa
  * propre matiere) : indispensable pour que la fiche de paie montre la
  * matiere de chaque session effectuee, pas seulement un total global.
- * Inclut aussi les heures saisies manuellement dont le jour tombe dans
- * cette plage (voir calculerComptabilisation), listees separement : ce ne
- * sont pas des sessions reelles avec une classe/matiere, juste un
- * rattrapage global. */
+ * Inclut aussi les heures saisies manuellement (voir calculerComptabilisation
+ * pour le choix periodeId vs date), listees separement : ce ne sont pas des
+ * sessions reelles avec une classe/matiere, juste un rattrapage global. */
 export async function detailSessionsProfesseur(
   professeurId: number,
   dateDebut: Date,
-  dateFin: Date
+  dateFin: Date,
+  periodeId?: number
 ): Promise<{ sessions: SessionDetail[]; parMatiere: DetailParMatiere[]; manuelles: SaisieManuelleDetail[] }> {
   const cours = await prisma.cours.findMany({
     where: { professeurId, statut: "VALIDE", dateCours: { gte: dateDebut, lte: dateFin } },
@@ -181,7 +188,7 @@ export async function detailSessionsProfesseur(
 
   const manuelles: SaisieManuelleDetail[] = (
     await prisma.saisieHeuresManuelle.findMany({
-      where: { professeurId, date: { gte: dateDebut, lte: dateFin } },
+      where: periodeId ? { professeurId, periodeId } : { professeurId, date: { gte: dateDebut, lte: dateFin } },
       orderBy: { date: "asc" },
     })
   ).map((s) => ({
