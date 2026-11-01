@@ -100,6 +100,29 @@ export async function genererRapportMensuelPdf(params: {
     );
     y += 22 + 20;
 
+    const hauteurSignature = 90;
+    sauterPageSiNecessaire(hauteurSignature + 40);
+    doc.fontSize(12).fillColor(NAVY).font("Helvetica-Bold").text("Approbation", xMarge, y);
+    y += 20;
+
+    const largeurColonne = (largeurPage - 20) / 2;
+    const xGauche = xMarge;
+    const xDroite = xMarge + largeurColonne + 20;
+    const yDepartSignature = y;
+
+    function blocSignature(x: number, titre: string) {
+      doc.rect(x, yDepartSignature, largeurColonne, hauteurSignature).strokeColor(BORDURE).lineWidth(1).stroke();
+      doc.fontSize(11).font("Helvetica-Bold").fillColor(NAVY).text(titre, x + 10, yDepartSignature + 10);
+      doc.fontSize(9).font("Helvetica").fillColor("#000000");
+      doc.text("Nom : ....................................................", x + 10, yDepartSignature + 38);
+      doc.text("Date : ......../......../..........", x + 10, yDepartSignature + 58);
+      doc.text("Signature :", x + 10, yDepartSignature + 76);
+    }
+
+    blocSignature(xGauche, "Le Comptable");
+    blocSignature(xDroite, "Le Directeur");
+    y = yDepartSignature + hauteurSignature + 20;
+
     sauterPageSiNecessaire(14);
     doc.fontSize(8).font("Helvetica-Oblique").fillColor(GRIS)
       .text(`Document généré le ${new Date().toLocaleDateString("fr-FR")} — ${nomEtablissement} — document de synthèse, à rapprocher du tableau de bord.`, xMarge, y, { width: largeurPage });

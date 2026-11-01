@@ -3,25 +3,24 @@ import { lireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { calculerComptabilisation, detailSessionsProfesseur } from "@/lib/comptabilisation";
 import { genererEmargementPdf, type LigneEmargement } from "@/lib/emargementPdf";
+import { resoudreMoisCalendaire } from "@/lib/moisCalendaire";
 
-/** Fiche d'emargement PDF du mois calendaire en cours - carte "Fiche
- * d'emargement" du tableau de bord. Un professeur par ligne (nom et
- * prenoms, matiere(s) enseignee(s), heures totales, montant du, case
- * signature vide), uniquement ceux ayant des heures validees ce mois-ci -
- * signer pour 0 h / 0 FCFA n'a pas de sens. */
-export async function GET() {
+/** Fiche d'emargement PDF d'un mois calendaire - carte "Fiche d'emargement"
+ * du tableau de bord. Mois en cours par defaut, ou ?periode=YYYY-MM pour un
+ * mois precedent. Un professeur par ligne (nom et prenoms, matiere(s)
+ * enseignee(s), heures totales, montant du, case signature vide),
+ * uniquement ceux ayant des heures validees ce mois-la - signer pour
+ * 0 h / 0 FCFA n'a pas de sens. */
+export async function GET(request: Request) {
   const session = await lireSession();
   if (!session) return NextResponse.json({ erreur: "Non autorise." }, { status: 403 });
+
+  const { searchParams } = new URL(request.url);
+  const { dateDebut, dateFin, moisLibelle, valeur } = resoudreMoisCalendaire(searchParams.get("periode"));
 
   const nomEtablissement = (await prisma.parametre.findUnique({ where: { cle: "NOM_ETABLISSEMENT" } }))?.valeur ?? "Collège Privé Kaloh";
   const regle = await prisma.regleValidation.findFirst({ where: { actif: true }, orderBy: { dateApplication: "desc" } });
   const taux = Number(regle?.tauxHoraireGeneral ?? 0);
-
-  const maintenant = new Date();
-  const dateDebut = new Date(Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth(), 1));
-  const dateFin = new Date(Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth() + 1, 0, 23, 59, 59, 999));
-  const libelleBrut = maintenant.toLocaleDateString("fr-FR", { month: "long", year: "numeric", timeZone: "UTC" });
-  const moisLibelle = libelleBrut.charAt(0).toUpperCase() + libelleBrut.slice(1);
 
   const toutesLesLignes = await calculerComptabilisation(dateDebut, dateFin, taux);
   const lignesAvecHeures = toutesLesLignes.filter((l) => l.minutesValidees > 0);
@@ -41,7 +40,7 @@ export async function GET() {
   );
 
   const buffer = await genererEmargementPdf({ nomEtablissement, moisLibelle, lignes });
-  const nomFichier = `Emargement_${maintenant.getUTCFullYear()}-${String(maintenant.getUTCMonth() + 1).padStart(2, "0")}.pdf`;
+  const nomFichier = `Emargement_${valeur}.pdf`;
   return new NextResponse(buffer as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/pdf",

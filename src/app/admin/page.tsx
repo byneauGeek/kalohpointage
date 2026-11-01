@@ -5,9 +5,10 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { StatCard } from "@/components/admin/StatCard";
 import { Card } from "@/components/ui/Card";
 import { Reveal } from "@/components/ui/Reveal";
+import { Select } from "@/components/ui/Field";
+import { optionsMoisCalendaire } from "@/lib/moisCalendaire";
 
-const MOIS_EN_COURS = new Date().toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-const MOIS_EN_COURS_MAJ = MOIS_EN_COURS.charAt(0).toUpperCase() + MOIS_EN_COURS.slice(1);
+const OPTIONS_MOIS = optionsMoisCalendaire();
 
 export default async function TableauDeBord() {
   await exigerRole(["ADMIN", "COMPTABLE"]);
@@ -38,16 +39,22 @@ export default async function TableauDeBord() {
             <div className="flex-1">
               <h3 className="font-semibold text-[var(--color-navy-900)]">Rapport du mois</h3>
               <p className="mt-1 text-sm text-[var(--color-navy-900)]/55">
-                Heures validées et montants dus par professeur — {MOIS_EN_COURS_MAJ}.
+                Heures validées et montants dus par professeur, avec signature comptable et direction.
               </p>
-              <a
-                href="/api/admin/rapport-mensuel"
-                target="_blank"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-navy-800)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-navy-700)]"
-              >
-                <Printer size={15} />
-                Imprimer le rapport du mois
-              </a>
+              <form action="/api/admin/rapport-mensuel" method="GET" target="_blank" className="mt-3 flex flex-wrap items-center gap-2">
+                <Select name="periode" defaultValue={OPTIONS_MOIS[0].valeur} className="w-auto">
+                  {OPTIONS_MOIS.map((m) => (
+                    <option key={m.valeur} value={m.valeur}>{m.libelle}</option>
+                  ))}
+                </Select>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-navy-800)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-navy-700)]"
+                >
+                  <Printer size={15} />
+                  Imprimer
+                </button>
+              </form>
             </div>
           </Card>
 
@@ -58,16 +65,22 @@ export default async function TableauDeBord() {
             <div className="flex-1">
               <h3 className="font-semibold text-[var(--color-navy-900)]">Fiche d&apos;émargement</h3>
               <p className="mt-1 text-sm text-[var(--color-navy-900)]/55">
-                Nom, matière(s), heures, montant dû et signature — {MOIS_EN_COURS_MAJ}.
+                Nom, matière(s), heures, montant dû et signature par professeur.
               </p>
-              <a
-                href="/api/admin/emargement"
-                target="_blank"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-navy-800)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-navy-700)]"
-              >
-                <Printer size={15} />
-                Imprimer la fiche d&apos;émargement
-              </a>
+              <form action="/api/admin/emargement" method="GET" target="_blank" className="mt-3 flex flex-wrap items-center gap-2">
+                <Select name="periode" defaultValue={OPTIONS_MOIS[0].valeur} className="w-auto">
+                  {OPTIONS_MOIS.map((m) => (
+                    <option key={m.valeur} value={m.valeur}>{m.libelle}</option>
+                  ))}
+                </Select>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-navy-800)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-navy-700)]"
+                >
+                  <Printer size={15} />
+                  Imprimer
+                </button>
+              </form>
             </div>
           </Card>
         </div>
