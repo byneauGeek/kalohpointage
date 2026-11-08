@@ -4,10 +4,12 @@ import { prisma } from "@/lib/db";
 import { formatMinutes } from "@/lib/heureUtils";
 import { desactiverCreneau } from "./actions";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Card, CardTitle } from "@/components/ui/Card";
 import { Table, Thead, Th, Tr, Td, EmptyState } from "@/components/ui/Table";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 import FormulaireImport from "./ImportForm";
+import ProfesseurSelector from "./ProfesseurSelector";
 
 const JOURS = ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
@@ -47,6 +49,18 @@ export default async function PageEmploiDuTemps({
 
       {session.role === "ADMIN" && (
         <Reveal>
+          <Card className="mb-6 max-w-xl">
+            <CardTitle>Modifier l&apos;emploi du temps d&apos;un professeur</CardTitle>
+            <p className="mb-3 text-sm text-[var(--color-navy-900)]/55">
+              Tous les créneaux d&apos;un professeur sur un seul écran, modifiables en une fois.
+            </p>
+            <ProfesseurSelector professeurs={professeurs.map((p) => ({ id: p.id, label: `${p.nom} ${p.prenom} (${p.matricule})` }))} />
+          </Card>
+        </Reveal>
+      )}
+
+      {session.role === "ADMIN" && (
+        <Reveal delay={0.04}>
           <FormulaireImport
             professeurs={professeurs.map((p) => ({ id: p.id, label: `${p.nom} ${p.prenom} (${p.matricule})` }))}
             matieres={matieres.map((m) => ({ id: m.id, label: m.libelle }))}
@@ -75,7 +89,7 @@ export default async function PageEmploiDuTemps({
                 {session.role === "ADMIN" && (
                   <Td>
                     <div className="flex items-center gap-2">
-                      <a href={`/admin/emploi-du-temps/${e.id}`} className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-navy-800)] hover:underline">
+                      <a href={`/admin/emploi-du-temps/professeur/${e.professeurId}`} className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-navy-800)] hover:underline">
                         <Pencil size={13} />
                         Modifier
                       </a>
