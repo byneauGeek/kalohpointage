@@ -9,8 +9,13 @@ import { resoudreMoisCalendaire } from "@/lib/moisCalendaire";
  * du tableau de bord. Mois en cours par defaut, ou ?periode=YYYY-MM pour un
  * mois precedent. Un professeur par ligne (nom et prenoms, matiere(s)
  * enseignee(s), heures totales, montant du, case signature vide),
- * uniquement ceux ayant des heures validees ce mois-la - signer pour
- * 0 h / 0 FCFA n'a pas de sens. */
+ * uniquement ceux ayant un montant du ce mois-la - signer pour 0 h / 0 FCFA
+ * n'a pas de sens. Filtre sur le montant et non sur les minutes : un
+ * professeur PERMANENT touche son salaire fixe meme a 0h un mois donne, il
+ * doit donc rester sur la fiche (voir calculerComptabilisation) - sinon son
+ * montant serait absent ici tout en comptant dans le total du rapport
+ * mensuel (meme calcul, memes lignes), ce qui desynchroniserait les deux
+ * documents. */
 export async function GET(request: Request) {
   const session = await lireSession();
   if (!session) return NextResponse.json({ erreur: "Non autorise." }, { status: 403 });
@@ -23,7 +28,7 @@ export async function GET(request: Request) {
   const taux = Number(regle?.tauxHoraireGeneral ?? 0);
 
   const toutesLesLignes = await calculerComptabilisation(dateDebut, dateFin, taux);
-  const lignesAvecHeures = toutesLesLignes.filter((l) => l.minutesValidees > 0);
+  const lignesAvecHeures = toutesLesLignes.filter((l) => l.minutesValidees > 0 || l.montant > 0);
 
   const lignes: LigneEmargement[] = await Promise.all(
     lignesAvecHeures.map(async (l) => {
