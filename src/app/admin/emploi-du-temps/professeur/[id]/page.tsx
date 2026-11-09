@@ -10,7 +10,7 @@ export default async function PageEmploiDuTempsProfesseur({ params }: { params: 
   const { id } = await params;
   const professeurId = Number(id);
 
-  const [professeur, matieres, classes, creneaux, premierePeriode] = await Promise.all([
+  const [professeur, matieres, classes, creneaux, periodes] = await Promise.all([
     prisma.professeur.findUnique({ where: { id: professeurId } }),
     prisma.matiere.findMany({ where: { actif: true }, orderBy: { libelle: "asc" } }),
     prisma.classe.findMany({ where: { actif: true }, orderBy: { nomClasse: "asc" } }),
@@ -19,17 +19,18 @@ export default async function PageEmploiDuTempsProfesseur({ params }: { params: 
       include: { classe: true },
       orderBy: [{ jourSemaine: "asc" }, { heureDebutMin: "asc" }],
     }),
-    prisma.periodeGrille.findFirst({ where: { actif: true }, orderBy: { ordre: "asc" } }),
+    prisma.periodeGrille.findMany({ where: { actif: true }, orderBy: { ordre: "asc" } }),
   ]);
   if (!professeur) notFound();
 
   // Professeur sans aucun creneau actif : plutot qu'une seule ligne vide a
-  // dupliquer 4 fois a la main, on propose directement une ligne par jour
-  // ouvre (lundi-vendredi), sur le premier creneau de la grille horaire de
-  // l'etablissement - matiere et classe restent a choisir. Une ligne non
-  // completee par l'admin est de toute facon ignoree a l'enregistrement
-  // (voir EmploiDuTempsProfesseurForm/l'API, qui ne gardent que les lignes
-  // entierement remplies), donc proposer ces 5 lignes est sans risque.
+  // dupliquer a la main, on propose d'office la grille horaire complete de
+  // l'etablissement (toutes les periodes, du lundi au vendredi) - matiere
+  // et classe restent a choisir, ligne par ligne, ou a supprimer pour les
+  // periodes non enseignees. Une ligne non completee par l'admin est de
+  // toute facon ignoree a l'enregistrement (voir EmploiDuTempsProfesseurForm
+  // /l'API, qui ne gardent que les lignes entierement remplies), donc
+  // proposer toutes ces lignes par defaut est sans risque.
   const creneauxInitiaux =
     creneaux.length > 0
       ? creneaux.map((c) => ({
@@ -40,15 +41,15 @@ export default async function PageEmploiDuTempsProfesseur({ params }: { params: 
           heureFin: formatMinutes(c.heureFinMin).replace("h", ":"),
           classe: c.classe.nomClasse,
         }))
-      : premierePeriode
-        ? [1, 2, 3, 4, 5].map((jour) => ({
+      : [1, 2, 3, 4, 5].flatMap((jour) =>
+          periodes.map((periode) => ({
             jourSemaine: String(jour),
             matiereId: "",
-            heureDebut: formatMinutes(premierePeriode.heureDebutMin).replace("h", ":"),
-            heureFin: formatMinutes(premierePeriode.heureFinMin).replace("h", ":"),
+            heureDebut: formatMinutes(periode.heureDebutMin).replace("h", ":"),
+            heureFin: formatMinutes(periode.heureFinMin).replace("h", ":"),
             classe: "",
           }))
-        : [];
+        );
 
   return (
     <div>
