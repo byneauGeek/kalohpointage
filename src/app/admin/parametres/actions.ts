@@ -5,7 +5,6 @@ import { prisma } from "@/lib/db";
 import { exigerRole } from "@/lib/auth";
 import { enregistrerAudit } from "@/lib/audit";
 import { genererJetonPointage } from "@/lib/jetonPointage";
-import { CLE_MODE_COMPTAGE_SIMULTANE } from "@/lib/comptabilisation";
 
 /** Les regles sont HISTORISEES par date d'application (jamais ecrasees) :
  * un cours utilise toujours la regle active a SA date, jamais la regle
@@ -54,21 +53,6 @@ export async function enregistrerNomEtablissement(formData: FormData) {
     update: { valeur },
   });
   await enregistrerAudit({ utilisateurId: session.userId, action: "MODIFICATION_PARAMETRES", nouvelleValeur: valeur });
-  revalidatePath("/admin/parametres");
-}
-
-/** Choix de l'etablissement pour le comptage des heures d'un professeur qui
- * a plusieurs classes en simultane sur un meme creneau (voir
- * src/lib/comptabilisation.ts pour le detail du calcul). */
-export async function enregistrerModeComptageSimultane(formData: FormData) {
-  const session = await exigerRole(["ADMIN"]);
-  const valeur = String(formData.get("modeComptageSimultane") ?? "PAR_CLASSE");
-  await prisma.parametre.upsert({
-    where: { cle: CLE_MODE_COMPTAGE_SIMULTANE },
-    create: { cle: CLE_MODE_COMPTAGE_SIMULTANE, valeur },
-    update: { valeur },
-  });
-  await enregistrerAudit({ utilisateurId: session.userId, action: "MODIFICATION_PARAMETRES", nouvelleValeur: `${CLE_MODE_COMPTAGE_SIMULTANE}=${valeur}` });
   revalidatePath("/admin/parametres");
 }
 

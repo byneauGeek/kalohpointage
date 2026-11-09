@@ -125,6 +125,18 @@ model Matiere {
   libelle   String  @unique
   actif     Boolean @default(true)
 
+  // Comment compter les heures d'un professeur qui enseigne CETTE matiere a
+  // plusieurs classes en simultane sur un meme creneau (ex. 3e1/3e2/3e3 en
+  // meme temps - voir emploi du temps, qui l'autorise). PAR_CLASSE (defaut,
+  // comportement historique) compte chaque classe separement.
+  // UNE_FOIS_PAR_CRENEAU ne compte le temps qu'une fois par plage horaire
+  // couverte, quel que soit le nombre de classes simultanees. Parametrable
+  // PAR MATIERE (pas globalement) : une matiere ou la charge augmente
+  // reellement avec le nombre de classes (ex. vacataire remplacant) peut
+  // differer d'une matiere de surveillance/encadrement groupe (voir
+  // src/lib/comptabilisation.ts). Voir /admin/matieres pour le reglage.
+  modeComptageSimultane String @default("PAR_CLASSE")
+
   emploisDuTemps EmploiDuTemps[]
   cours          Cours[]
   affectations   AffectationEnseignement[]
@@ -262,8 +274,10 @@ model Cours {
 
   // classeId inclus : un professeur peut avoir plusieurs classes en
   // simultane sur le meme creneau (voir emploi du temps), chacune generant
-  // sa propre occurrence de Cours ce jour-la.
-  @@unique([professeurId, dateCours, heureDebutPrevueMin, classeId])
+  // sa propre occurrence de Cours ce jour-la. matiereId inclus : une meme
+  // classe peut aussi avoir plusieurs matieres sur le meme creneau (co-
+  // enseignement), chacune generant sa propre occurrence.
+  @@unique([professeurId, dateCours, heureDebutPrevueMin, classeId, matiereId])
   @@map("cours")
 }
 

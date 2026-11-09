@@ -2,8 +2,9 @@
  * Portage de mdl_MoteurCours (LOT 4) : genere les occurrences de cours (table
  * Cours) a partir de l'emploi du temps, pour une periode donnee, en ignorant
  * les jours non ouvres. Idempotent : repose sur la contrainte unique
- * (professeurId, dateCours, heureDebutPrevueMin) - relancer sur la meme
- * periode ne duplique jamais rien (voir Journal_Decisions.md D08/D29).
+ * (professeurId, dateCours, heureDebutPrevueMin, classeId, matiereId) -
+ * relancer sur la meme periode ne duplique jamais rien (voir
+ * Journal_Decisions.md D08/D29).
  *
  * Implemente en UNE requete SQL brute (generate_series + jointure + INSERT
  * ... ON CONFLICT DO NOTHING) plutot qu'une boucle JS avec un aller-retour
@@ -76,7 +77,7 @@ export async function genererCoursPeriode(dateDebut: Date, dateFin: Date) {
     WHERE j::date NOT IN (
       SELECT "dateJour"::date FROM "jours_non_ouvres" WHERE "dateJour" BETWEEN ${debut}::timestamp AND ${fin}::timestamp
     )
-    ON CONFLICT ("professeurId", "dateCours", "heureDebutPrevueMin", "classeId") DO NOTHING
+    ON CONFLICT ("professeurId", "dateCours", "heureDebutPrevueMin", "classeId", "matiereId") DO NOTHING
   `;
 
   return { nbCrees, nbIgnores: Number(total) - nbCrees };

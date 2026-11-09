@@ -8,17 +8,18 @@
 import { prisma } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
 
-/** Parametre : comment compter les heures d'un professeur qui a plusieurs
- * classes en simultane sur un meme creneau (ex. 3e1/3e2/3e3 en meme temps -
- * voir emploi du temps, qui l'autorise). PAR_CLASSE (defaut, comportement
- * historique) compte chaque classe separement : un vacataire est alors paye
- * pour chaque classe prise en charge. UNE_FOIS_PAR_CRENEAU ne compte le
- * temps qu'une fois par plage horaire couverte, quel que soit le nombre de
- * classes simultanees - pertinent notamment pour un permanent, dont le
- * quota/les heures sup doivent refleter le temps reellement passe, pas le
- * nombre de classes couvertes au meme moment. Choix laisse a
- * l'etablissement (voir /admin/parametres), pas fige dans le code. */
-export const CLE_MODE_COMPTAGE_SIMULTANE = "MODE_COMPTAGE_SEANCES_SIMULTANEES";
+/** Comment compter les heures d'un professeur qui enseigne UNE MATIERE
+ * donnee a plusieurs classes en simultane sur un meme creneau (ex.
+ * 3e1/3e2/3e3 en meme temps - voir emploi du temps, qui l'autorise).
+ * PAR_CLASSE (defaut, comportement historique) compte chaque classe
+ * separement : un vacataire est alors paye pour chaque classe prise en
+ * charge. UNE_FOIS_PAR_CRENEAU ne compte le temps qu'une fois par plage
+ * horaire couverte, quel que soit le nombre de classes simultanees -
+ * pertinent notamment pour un permanent, dont le quota/les heures sup
+ * doivent refleter le temps reellement passe, pas le nombre de classes
+ * couvertes au meme moment. PARAMETRABLE PAR MATIERE (pas globalement, voir
+ * /admin/matieres) : une matiere peut avoir une logique differente d'une
+ * autre pour ce meme professeur. */
 export type ModeComptageSimultane = "PAR_CLASSE" | "UNE_FOIS_PAR_CRENEAU";
 
 type CoursPourDedoublonnage = {
@@ -26,35 +27,55 @@ type CoursPourDedoublonnage = {
   heureDebutPrevueMin: number;
   heureFinPrevueMin: number;
   dureeValideeMin: number | null;
+  matiereId: number;
+  matiere: { modeComptageSimultane: string };
 };
 
-/** Additionne dureeValideeMin, mais en ne comptant qu'une fois chaque plage
- * horaire couverte par plusieurs classes simultanees (meme professeur, meme
- * jour) : regroupe les cours qui se chevauchent (ou s'enchainent) en
- * grappes, et ne retient que la duree validee la plus longue de chaque
- * grappe plutot que leur somme. */
-function minutesValideesSansDoublonSimultane(cours: CoursPourDedoublonnage[]): number {
-  const parJour = new Map<string, CoursPourDedoublonnage[]>();
+/** Additionne dureeValideeMin sur l'ensemble des cours d'un professeur,
+ * matiere par matiere (chaque matiere a son propre mode de comptage des
+ * classes simultanees - voir ModeComptageSimultane). Pour une matiere en
+ * UNE_FOIS_PAR_CRENEAU : regroupe les cours de CETTE matiere qui se
+ * chevauchent (ou s'enchainent, meme jour) en grappes, et ne retient que la
+ * duree validee la plus longue de chaque grappe plutot que leur somme.
+ * Pour PAR_CLASSE (defaut) : simple somme, chaque classe comptant
+ * separement. */
+function minutesValideesParProfesseur(cours: CoursPourDedoublonnage[]): number {
+  const parMatiere = new Map<number, CoursPourDedoublonnage[]>();
   for (const c of cours) {
-    const cle = c.dateCours.toISOString().slice(0, 10);
-    if (!parJour.has(cle)) parJour.set(cle, []);
-    parJour.get(cle)!.push(c);
+    if (!parMatiere.has(c.matiereId)) parMatiere.set(c.matiereId, []);
+    parMatiere.get(c.matiereId)!.push(c);
   }
 
   let total = 0;
-  for (const coursDuJour of parJour.values()) {
-    const tries = [...coursDuJour].sort((a, b) => a.heureDebutPrevueMin - b.heureDebutPrevueMin);
-    let grappeFin = -Infinity;
-    let grappeMax = 0;
-    for (const c of tries) {
-      if (c.heureDebutPrevueMin > grappeFin) {
-        total += grappeMax;
-        grappeMax = 0;
-      }
-      grappeMax = Math.max(grappeMax, c.dureeValideeMin ?? 0);
-      grappeFin = Math.max(grappeFin, c.heureFinPrevueMin);
+  for (const coursDeLaMatiere of parMatiere.values()) {
+    const mode: ModeComptageSimultane =
+      coursDeLaMatiere[0].matiere.modeComptageSimultane === "UNE_FOIS_PAR_CRENEAU" ? "UNE_FOIS_PAR_CRENEAU" : "PAR_CLASSE";
+    if (mode === "PAR_CLASSE") {
+      total += coursDeLaMatiere.reduce((s, c) => s + (c.dureeValideeMin ?? 0), 0);
+      continue;
     }
-    total += grappeMax;
+
+    const parJour = new Map<string, CoursPourDedoublonnage[]>();
+    for (const c of coursDeLaMatiere) {
+      const cle = c.dateCours.toISOString().slice(0, 10);
+      if (!parJour.has(cle)) parJour.set(cle, []);
+      parJour.get(cle)!.push(c);
+    }
+
+    for (const coursDuJour of parJour.values()) {
+      const tries = [...coursDuJour].sort((a, b) => a.heureDebutPrevueMin - b.heureDebutPrevueMin);
+      let grappeFin = -Infinity;
+      let grappeMax = 0;
+      for (const c of tries) {
+        if (c.heureDebutPrevueMin > grappeFin) {
+          total += grappeMax;
+          grappeMax = 0;
+        }
+        grappeMax = Math.max(grappeMax, c.dureeValideeMin ?? 0);
+        grappeFin = Math.max(grappeFin, c.heureFinPrevueMin);
+      }
+      total += grappeMax;
+    }
   }
   return total;
 }
@@ -82,8 +103,6 @@ export async function calculerComptabilisation(
   periodeId?: number
 ): Promise<LigneComptabilisation[]> {
   const professeurs = await prisma.professeur.findMany({ where: { actif: true } });
-  const parametreModeSimultane = await prisma.parametre.findUnique({ where: { cle: CLE_MODE_COMPTAGE_SIMULTANE } });
-  const modeSimultane: ModeComptageSimultane = parametreModeSimultane?.valeur === "UNE_FOIS_PAR_CRENEAU" ? "UNE_FOIS_PAR_CRENEAU" : "PAR_CLASSE";
 
   // Heures saisies manuellement (rattrapage pre-mise en service, voir
   // src/app/admin/heures-manuelles) - regroupees par professeur pour un
@@ -112,13 +131,17 @@ export async function calculerComptabilisation(
         statut: "VALIDE",
         dateCours: { gte: dateDebut, lte: dateFin },
       },
-      select: { dateCours: true, heureDebutPrevueMin: true, heureFinPrevueMin: true, dureeValideeMin: true },
+      select: {
+        dateCours: true,
+        heureDebutPrevueMin: true,
+        heureFinPrevueMin: true,
+        dureeValideeMin: true,
+        matiereId: true,
+        matiere: { select: { modeComptageSimultane: true } },
+      },
     });
     const minutesManuelles = minutesManuellesParProf.get(prof.id) ?? 0;
-    const minutesCours =
-      modeSimultane === "UNE_FOIS_PAR_CRENEAU"
-        ? minutesValideesSansDoublonSimultane(coursValides)
-        : coursValides.reduce((s, c) => s + (c.dureeValideeMin ?? 0), 0);
+    const minutesCours = minutesValideesParProfesseur(coursValides);
     const minutesValidees = minutesCours + minutesManuelles;
     const avertissements: string[] = [];
     if (minutesManuelles > 0) {

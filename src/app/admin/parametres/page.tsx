@@ -1,4 +1,4 @@
-import { Save, Settings, CalendarPlus, KeyRound, Users } from "lucide-react";
+import { Save, Settings, CalendarPlus, KeyRound } from "lucide-react";
 import { exigerRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
@@ -6,10 +6,8 @@ import {
   enregistrerNomEtablissement,
   cloturerAnneeScolaire,
   genererJetonPointageAction,
-  enregistrerModeComptageSimultane,
 } from "./actions";
 import { jetonActif, DUREE_JETON_HEURES } from "@/lib/jetonPointage";
-import { CLE_MODE_COMPTAGE_SIMULTANE } from "@/lib/comptabilisation";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Input, Select, Label } from "@/components/ui/Field";
@@ -30,7 +28,6 @@ export default async function PageParametres({
   const { erreur, succes } = await searchParams;
   const regle = await prisma.regleValidation.findFirst({ where: { actif: true }, orderBy: { dateApplication: "desc" } });
   const nomEtablissement = await prisma.parametre.findUnique({ where: { cle: "NOM_ETABLISSEMENT" } });
-  const modeComptageSimultane = await prisma.parametre.findUnique({ where: { cle: CLE_MODE_COMPTAGE_SIMULTANE } });
   const creneauxOuverts = await prisma.emploiDuTemps.count({ where: { actif: true, dateFinValidite: null } });
   const jeton = await jetonActif();
 
@@ -94,30 +91,6 @@ export default async function PageParametres({
                 Enregistrer les règles
               </Button>
             </div>
-          </form>
-        </Card>
-      </Reveal>
-
-      <Reveal delay={0.12}>
-        <Card className="mt-8 max-w-xl">
-          <CardTitle>Classes simultanées</CardTitle>
-          <p className="mb-4 text-sm text-[var(--color-navy-900)]/55">
-            Un professeur peut avoir plusieurs classes en même temps sur un même créneau (ex. 3e1, 3e2 et 3e3
-            en simultané). Choisissez comment compter ces heures dans la comptabilisation et la fiche
-            d&apos;émargement.
-          </p>
-          <form action={enregistrerModeComptageSimultane} className="flex flex-wrap items-end gap-2">
-            <div className="max-w-md flex-1">
-              <Label>Mode de comptage</Label>
-              <Select name="modeComptageSimultane" defaultValue={modeComptageSimultane?.valeur ?? "PAR_CLASSE"}>
-                <option value="PAR_CLASSE">Par classe (chaque classe simultanée compte séparément)</option>
-                <option value="UNE_FOIS_PAR_CRENEAU">Une seule fois par créneau (quel que soit le nombre de classes)</option>
-              </Select>
-            </div>
-            <Button type="submit" size="sm">
-              <Users size={14} />
-              Enregistrer
-            </Button>
           </form>
         </Card>
       </Reveal>
