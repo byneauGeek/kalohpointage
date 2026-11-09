@@ -7,15 +7,16 @@ import { Input, Select } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 
 type LigneInitiale = { id?: number; jourSemaine: string; matiereId: string; heureDebut: string; heureFin: string; classe: string };
-// matiereIdsSupp/multi : etat client uniquement (co-enseignement - voir case
-// "Plusieurs matières"), jamais envoye tel quel au serveur : chaque matiere
-// (principale + supplementaires) devient sa propre ligne EmploiDuTemps a
-// l'enregistrement (meme jour/horaires/classe), voir soumettre().
-type Ligne = LigneInitiale & { matiereIdsSupp: string[]; multi: boolean };
+// classesSupp/multi : etat client uniquement (classes simultanees - voir
+// case "Plusieurs classes"), jamais envoye tel quel au serveur : chaque
+// classe (principale + supplementaires) devient sa propre ligne
+// EmploiDuTemps/Cours a l'enregistrement (meme jour/horaires/matiere), voir
+// soumettre().
+type Ligne = LigneInitiale & { classesSupp: string[]; multi: boolean };
 type Option = { id: number; label: string };
 
 const JOURS = ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
-const LIGNE_VIDE: Ligne = { jourSemaine: "1", matiereId: "", heureDebut: "", heureFin: "", classe: "", matiereIdsSupp: [], multi: false };
+const LIGNE_VIDE: Ligne = { jourSemaine: "1", matiereId: "", heureDebut: "", heureFin: "", classe: "", classesSupp: [], multi: false };
 
 export default function EmploiDuTempsProfesseurForm({
   professeurId,
@@ -30,7 +31,7 @@ export default function EmploiDuTempsProfesseurForm({
 }) {
   const router = useRouter();
   const [lignes, setLignes] = useState<Ligne[]>(
-    (creneauxInitiaux.length > 0 ? creneauxInitiaux : [LIGNE_VIDE]).map((l) => ({ ...l, matiereIdsSupp: [], multi: false }))
+    (creneauxInitiaux.length > 0 ? creneauxInitiaux : [LIGNE_VIDE]).map((l) => ({ ...l, classesSupp: [], multi: false }))
   );
   const [envoi, setEnvoi] = useState(false);
   const [erreurs, setErreurs] = useState<string[] | null>(null);
@@ -41,17 +42,17 @@ export default function EmploiDuTempsProfesseurForm({
   }
 
   function basculerMulti(index: number) {
-    setLignes((l) => l.map((ligne, i) => (i === index ? { ...ligne, multi: !ligne.multi, matiereIdsSupp: ligne.multi ? [] : ligne.matiereIdsSupp } : ligne)));
+    setLignes((l) => l.map((ligne, i) => (i === index ? { ...ligne, multi: !ligne.multi, classesSupp: ligne.multi ? [] : ligne.classesSupp } : ligne)));
   }
 
-  function basculerMatiereSupp(index: number, matiereId: string, coche: boolean) {
+  function basculerClasseSupp(index: number, classe: string, coche: boolean) {
     setLignes((l) =>
       l.map((ligne, i) => {
         if (i !== index) return ligne;
-        const ensemble = new Set(ligne.matiereIdsSupp);
-        if (coche) ensemble.add(matiereId);
-        else ensemble.delete(matiereId);
-        return { ...ligne, matiereIdsSupp: Array.from(ensemble) };
+        const ensemble = new Set(ligne.classesSupp);
+        if (coche) ensemble.add(classe);
+        else ensemble.delete(classe);
+        return { ...ligne, classesSupp: Array.from(ensemble) };
       })
     );
   }
@@ -73,17 +74,17 @@ export default function EmploiDuTempsProfesseurForm({
       return;
     }
 
-    // Une ligne avec "plusieurs matières" cochee devient une entree par
-    // matiere selectionnee (principale + supplementaires), toutes avec le
-    // meme jour/horaires/classe - voir le type Ligne ci-dessus.
+    // Une ligne avec "plusieurs classes" cochee devient une entree par
+    // classe selectionnee (principale + supplementaires), toutes avec le
+    // meme jour/horaires/matiere - voir le type Ligne ci-dessus.
     const entreesResolues = lignesCompletes.flatMap((l) => {
-      const base = { jourSemaine: Number(l.jourSemaine), heureDebut: l.heureDebut, heureFin: l.heureFin, classe: l.classe };
-      const supplementaires = l.multi
-        ? Array.from(new Set(l.matiereIdsSupp)).filter((m) => m && Number(m) !== Number(l.matiereId))
+      const base = { jourSemaine: Number(l.jourSemaine), matiereId: Number(l.matiereId), heureDebut: l.heureDebut, heureFin: l.heureFin };
+      const classesSupp = l.multi
+        ? Array.from(new Set(l.classesSupp)).filter((c) => c.trim() && c.trim().toLowerCase() !== l.classe.trim().toLowerCase())
         : [];
       return [
-        { id: l.id, matiereId: Number(l.matiereId), ...base },
-        ...supplementaires.map((m) => ({ matiereId: Number(m), ...base })),
+        { id: l.id, classe: l.classe, ...base },
+        ...classesSupp.map((c) => ({ classe: c, ...base })),
       ];
     });
 
@@ -110,8 +111,8 @@ export default function EmploiDuTempsProfesseurForm({
       <CardTitle>Créneaux</CardTitle>
       <p className="mb-4 text-sm text-[var(--color-navy-900)]/55">
         Modifiez, ajoutez ou supprimez des lignes puis enregistrez : l&apos;ensemble remplace l&apos;emploi du temps actif de ce
-        professeur (toute ligne retirée ici désactive le créneau correspondant). Cochez « Plusieurs matières » sur une
-        ligne pour qu&apos;elle enseigne plusieurs matières à la fois sur ce créneau (co-enseignement).
+        professeur (toute ligne retirée ici désactive le créneau correspondant). Cochez « Plusieurs classes » sur une
+        ligne pour que ce professeur enseigne plusieurs classes à la fois sur ce créneau (classes simultanées).
       </p>
 
       {succes && (
@@ -150,15 +151,23 @@ export default function EmploiDuTempsProfesseurForm({
                   </option>
                 ))}
               </Select>
+              <Select value={ligne.matiereId} onChange={(e) => majLigne(i, "matiereId", e.target.value)}>
+                <option value="">Matière…</option>
+                {matieres.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </Select>
+              <Input type="time" value={ligne.heureDebut} onChange={(e) => majLigne(i, "heureDebut", e.target.value)} />
+              <Input type="time" value={ligne.heureFin} onChange={(e) => majLigne(i, "heureFin", e.target.value)} />
               <div>
-                <Select value={ligne.matiereId} onChange={(e) => majLigne(i, "matiereId", e.target.value)}>
-                  <option value="">Matière…</option>
-                  {matieres.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}
-                    </option>
-                  ))}
-                </Select>
+                <Input
+                  list="classes-existantes"
+                  placeholder="Classe"
+                  value={ligne.classe}
+                  onChange={(e) => majLigne(i, "classe", e.target.value)}
+                />
                 <label className="mt-1 flex items-center gap-1 text-[11px] text-[var(--color-navy-900)]/55">
                   <input
                     type="checkbox"
@@ -166,17 +175,9 @@ export default function EmploiDuTempsProfesseurForm({
                     onChange={() => basculerMulti(i)}
                     className="h-3 w-3 accent-[var(--color-gold-500)]"
                   />
-                  Plusieurs matières
+                  Plusieurs classes
                 </label>
               </div>
-              <Input type="time" value={ligne.heureDebut} onChange={(e) => majLigne(i, "heureDebut", e.target.value)} />
-              <Input type="time" value={ligne.heureFin} onChange={(e) => majLigne(i, "heureFin", e.target.value)} />
-              <Input
-                list="classes-existantes"
-                placeholder="Classe"
-                value={ligne.classe}
-                onChange={(e) => majLigne(i, "classe", e.target.value)}
-              />
               <Button
                 type="button"
                 variant="outline"
@@ -188,18 +189,18 @@ export default function EmploiDuTempsProfesseurForm({
               </Button>
             </div>
             {ligne.multi && (
-              <div className="ml-[calc(16.66%+0.5rem)] flex max-w-xs flex-wrap gap-2 rounded-lg border border-[var(--color-navy-900)]/15 p-2">
-                {matieres
-                  .filter((m) => String(m.id) !== ligne.matiereId)
-                  .map((m) => (
-                    <label key={m.id} className="flex items-center gap-1 text-xs text-[var(--color-navy-900)]">
+              <div className="ml-[calc(83.33%+0.5rem)] flex max-w-xs flex-wrap gap-2 rounded-lg border border-[var(--color-navy-900)]/15 p-2">
+                {classes
+                  .filter((c) => c.trim().toLowerCase() !== ligne.classe.trim().toLowerCase())
+                  .map((c) => (
+                    <label key={c} className="flex items-center gap-1 text-xs text-[var(--color-navy-900)]">
                       <input
                         type="checkbox"
-                        checked={ligne.matiereIdsSupp.includes(String(m.id))}
-                        onChange={(e) => basculerMatiereSupp(i, String(m.id), e.target.checked)}
+                        checked={ligne.classesSupp.includes(c)}
+                        onChange={(e) => basculerClasseSupp(i, c, e.target.checked)}
                         className="h-3 w-3 accent-[var(--color-gold-500)]"
                       />
-                      {m.label}
+                      {c}
                     </label>
                   ))}
               </div>

@@ -104,10 +104,8 @@ export async function POST(request: Request) {
   // qui se recouvrent) - l'envoi remplace tout l'emploi du temps actif du
   // professeur, donc seule la coherence interne de l'ensemble compte. Un
   // professeur peut avoir plusieurs classes en simultane sur le meme
-  // creneau (ex. 3e1/3e2/3e3 en meme temps), et une meme classe peut avoir
-  // plusieurs matieres sur le meme creneau (co-enseignement) : seul un
-  // chevauchement sur LA MEME classe ET LA MEME matiere est une vraie
-  // erreur (double saisie du meme creneau).
+  // creneau (ex. 3e1/3e2/3e3 en meme temps) : seul un chevauchement sur LA
+  // MEME classe est une vraie erreur (double saisie du meme creneau).
   for (let i = 0; i < resolues.length; i++) {
     for (let j = i + 1; j < resolues.length; j++) {
       const a = resolues[i];
@@ -115,11 +113,10 @@ export async function POST(request: Request) {
       if (
         a.jourSemaine === b.jourSemaine &&
         a.classeId === b.classeId &&
-        a.matiereId === b.matiereId &&
         a.heureDebutMin < b.heureFinMin &&
         a.heureFinMin > b.heureDebutMin
       ) {
-        erreurs.push(`Les lignes ${i + 1} et ${j + 1} se chevauchent sur la même classe et la même matière (même jour, horaires qui se recouvrent).`);
+        erreurs.push(`Les lignes ${i + 1} et ${j + 1} se chevauchent sur la même classe (même jour, horaires qui se recouvrent).`);
       }
     }
   }

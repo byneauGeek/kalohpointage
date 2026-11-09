@@ -8,7 +8,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Input, Select, Label } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
-import MatiereSelecteur from "./MatiereSelecteur";
 
 const JOURS = ["", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
@@ -36,23 +35,6 @@ export default async function PageModifierCreneau({
   ]);
   if (!creneau) notFound();
 
-  // Autres matieres deja enregistrees sur ce meme creneau (meme prof, jour,
-  // horaires, classe) - co-enseignement mis en place via la case "Plusieurs
-  // matieres" (voir modifierCreneau) : a pre-selectionner dans le formulaire.
-  const matieresSiblings = await prisma.emploiDuTemps.findMany({
-    where: {
-      id: { not: creneau.id },
-      professeurId: creneau.professeurId,
-      classeId: creneau.classeId,
-      jourSemaine: creneau.jourSemaine,
-      heureDebutMin: creneau.heureDebutMin,
-      heureFinMin: creneau.heureFinMin,
-      actif: true,
-    },
-    select: { matiereId: true },
-  });
-  const matiereIdsInitiaux = [creneau.matiereId, ...matieresSiblings.map((s) => s.matiereId)];
-
   const modifierAvecId = modifierCreneau.bind(null, creneau.id);
 
   return (
@@ -68,32 +50,34 @@ export default async function PageModifierCreneau({
           </p>
         )}
         <form action={modifierAvecId} className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 grid grid-cols-3 gap-3">
-            <div>
-              <Label>Jour</Label>
-              <Select name="jourSemaine" defaultValue={creneau.jourSemaine}>
-                {JOURS.slice(1).map((j, i) => (
-                  <option key={j} value={i + 1}>{j}</option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <Label>Heure début</Label>
-              <Input name="heureDebut" type="time" defaultValue={formatMinutes(creneau.heureDebutMin).replace("h", ":")} required />
-            </div>
-            <div>
-              <Label>Heure fin</Label>
-              <Input name="heureFin" type="time" defaultValue={formatMinutes(creneau.heureFinMin).replace("h", ":")} required />
-            </div>
+          <div>
+            <Label>Jour</Label>
+            <Select name="jourSemaine" defaultValue={creneau.jourSemaine}>
+              {JOURS.slice(1).map((j, i) => (
+                <option key={j} value={i + 1}>{j}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label>Matière</Label>
+            <Select name="matiereId" defaultValue={creneau.matiereId}>
+              {matieres.map((m) => (
+                <option key={m.id} value={m.id}>{m.libelle}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <Label>Heure début</Label>
+            <Input name="heureDebut" type="time" defaultValue={formatMinutes(creneau.heureDebutMin).replace("h", ":")} required />
+          </div>
+          <div>
+            <Label>Heure fin</Label>
+            <Input name="heureFin" type="time" defaultValue={formatMinutes(creneau.heureFinMin).replace("h", ":")} required />
           </div>
           <div className="col-span-2">
             <Label>Classe</Label>
             <Input name="classe" defaultValue={creneau.classe.nomClasse} required />
           </div>
-          <MatiereSelecteur
-            matieres={matieres.map((m) => ({ id: m.id, label: m.libelle }))}
-            matiereIdsInitiaux={matiereIdsInitiaux}
-          />
           <div className="col-span-2 flex items-end gap-2">
             <Button type="submit">
               <Save size={16} />

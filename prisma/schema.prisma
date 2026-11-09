@@ -274,10 +274,8 @@ model Cours {
 
   // classeId inclus : un professeur peut avoir plusieurs classes en
   // simultane sur le meme creneau (voir emploi du temps), chacune generant
-  // sa propre occurrence de Cours ce jour-la. matiereId inclus : une meme
-  // classe peut aussi avoir plusieurs matieres sur le meme creneau (co-
-  // enseignement), chacune generant sa propre occurrence.
-  @@unique([professeurId, dateCours, heureDebutPrevueMin, classeId, matiereId])
+  // sa propre occurrence de Cours ce jour-la.
+  @@unique([professeurId, dateCours, heureDebutPrevueMin, classeId])
   @@map("cours")
 }
 
