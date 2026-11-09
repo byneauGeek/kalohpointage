@@ -17,6 +17,7 @@ import { Reveal } from "@/components/ui/Reveal";
 const MESSAGES_ERREUR: Record<string, string> = {
   confirmation: 'Clôture annulée : vous devez taper exactement "CONFIRMER".',
   date: "Date de rentrée invalide.",
+  nom_vide: "Le nom de l'établissement ne peut pas être vide.",
 };
 
 export default async function PageParametres({
@@ -38,6 +39,16 @@ export default async function PageParametres({
       <Reveal>
         <Card className="mb-8 max-w-md">
           <CardTitle>Établissement</CardTitle>
+          {succes === "etablissement" && (
+            <p className="mb-3 rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+              Nom de l&apos;établissement enregistré.
+            </p>
+          )}
+          {erreur === "nom_vide" && (
+            <p className="mb-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+              {MESSAGES_ERREUR[erreur]}
+            </p>
+          )}
           <form action={enregistrerNomEtablissement} className="flex items-end gap-2">
             <Input name="nomEtablissement" defaultValue={nomEtablissement?.valeur ?? "Collège Privé Kaloh"} className="flex-1" />
             <Button type="submit" size="sm"><Save size={14} />Enregistrer</Button>
@@ -48,6 +59,11 @@ export default async function PageParametres({
       <Reveal delay={0.08}>
         <Card className="max-w-xl">
           <CardTitle>Règles de validation</CardTitle>
+          {succes === "regles" && (
+            <p className="mb-3 rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+              Règles de validation enregistrées.
+            </p>
+          )}
           <form action={enregistrerRegleValidation} className="grid grid-cols-2 gap-3">
             <p className="col-span-2 text-sm text-[var(--color-navy-900)]/55">
               Ces règles s&apos;appliquent à la prochaine « Appliquer les règles de validation » ; les cours déjà
@@ -152,6 +168,11 @@ export default async function PageParametres({
           ) : (
             <p className="mb-4 rounded-lg bg-[var(--color-warning-bg)] px-3 py-2 text-sm text-[var(--color-warning)]">
               Aucun code actif : l&apos;écran de pointage demandera un code à chaque nouvel appareil.
+            </p>
+          )}
+          {succes === "jeton" && (
+            <p className="mb-4 rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+              Nouveau code généré.
             </p>
           )}
 

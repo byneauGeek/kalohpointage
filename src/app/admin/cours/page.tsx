@@ -18,13 +18,24 @@ const MESSAGES_ERREUR_SUPPRESSION: Record<string, string> = {
   ordre: "La date de fin doit être postérieure ou égale à la date de début.",
 };
 
+const MESSAGES_ERREUR_RAPPROCHEMENT: Record<string, string> = {
+  pas_de_regle: "Aucune règle de validation active - configurez les paramètres d'abord.",
+};
+
 export default async function PageCours({
   searchParams,
 }: {
-  searchParams: Promise<{ statut?: string; erreurSuppression?: string; succesSuppression?: string }>;
+  searchParams: Promise<{
+    statut?: string;
+    erreurSuppression?: string;
+    succesSuppression?: string;
+    erreurRapprochement?: string;
+    succesRapprochement?: string;
+  }>;
 }) {
   const session = await exigerRole(["ADMIN", "COMPTABLE"]);
-  const { statut, erreurSuppression, succesSuppression } = await searchParams;
+  const { statut, erreurSuppression, succesSuppression, erreurRapprochement, succesRapprochement } = await searchParams;
+  const [nbAbsents, nbIncomplets] = succesRapprochement ? succesRapprochement.split("-").map(Number) : [0, 0];
 
   const cours = await prisma.cours.findMany({
     where: statut ? { statut: statut as never } : undefined,
@@ -39,16 +50,24 @@ export default async function PageCours({
 
       {session.role === "ADMIN" && (
         <Reveal>
-          <div className="mb-6 flex flex-wrap gap-4">
+          <div className="mb-6 flex flex-wrap items-start gap-4">
             <GenererCoursForm />
 
-            <Card padded className="flex items-end">
+            <Card padded className="flex flex-col gap-2">
               <form action={effectuerRapprochementAction}>
                 <Button type="submit" variant="outline">
                   <RefreshCcw size={16} />
                   Rapprochement
                 </Button>
               </form>
+              {succesRapprochement && (
+                <p className="text-xs text-[var(--color-success)]">
+                  {nbAbsents} absence(s), {nbIncomplets} incomplet(s) détecté(s).
+                </p>
+              )}
+              {erreurRapprochement && MESSAGES_ERREUR_RAPPROCHEMENT[erreurRapprochement] && (
+                <p className="text-xs text-[var(--color-danger)]">{MESSAGES_ERREUR_RAPPROCHEMENT[erreurRapprochement]}</p>
+              )}
             </Card>
           </div>
         </Reveal>

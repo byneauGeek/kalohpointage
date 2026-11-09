@@ -11,10 +11,24 @@ import { Badge } from "@/components/ui/Badge";
 import { Table, Thead, Th, Tr, Td, EmptyState } from "@/components/ui/Table";
 import { Reveal } from "@/components/ui/Reveal";
 
-export default async function PageProfesseurs({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+const MESSAGES_ERREUR: Record<string, string> = {
+  matricule_existe: "Ce matricule est déjà utilisé par un autre professeur.",
+};
+const MESSAGES_SUCCES: Record<string, string> = {
+  cree: "Professeur créé.",
+  modifie: "Professeur modifié.",
+  desactive: "Professeur désactivé.",
+  reactive: "Professeur réactivé.",
+};
+
+export default async function PageProfesseurs({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; erreur?: string; succes?: string }>;
+}) {
   const session = await exigerRole(["ADMIN", "COMPTABLE"]);
   const estAdmin = session.role === "ADMIN";
-  const { q } = await searchParams;
+  const { q, erreur, succes } = await searchParams;
   const recherche = q?.trim();
   const professeurs = await prisma.professeur.findMany({
     where: recherche
@@ -26,6 +40,17 @@ export default async function PageProfesseurs({ searchParams }: { searchParams: 
   return (
     <div>
       <PageHeader title="Professeurs" description="Fiches et statut contractuel du corps enseignant" />
+
+      {succes && MESSAGES_SUCCES[succes] && (
+        <p className="mb-4 rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+          {MESSAGES_SUCCES[succes]}
+        </p>
+      )}
+      {erreur && MESSAGES_ERREUR[erreur] && (
+        <p className="mb-4 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+          {MESSAGES_ERREUR[erreur]}
+        </p>
+      )}
 
       {estAdmin && (
         <>

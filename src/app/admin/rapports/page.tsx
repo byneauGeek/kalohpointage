@@ -11,8 +11,17 @@ import { StatutBadge } from "@/components/ui/Badge";
 import { Table, Thead, Th, Tr, Td, EmptyState } from "@/components/ui/Table";
 import { Reveal } from "@/components/ui/Reveal";
 
-export default async function PageRapports() {
+const MESSAGES_ERREUR: Record<string, string> = {
+  invalide: "Sélectionnez une période.",
+};
+
+export default async function PageRapports({
+  searchParams,
+}: {
+  searchParams: Promise<{ erreur?: string; succes?: string }>;
+}) {
   await exigerRole(["ADMIN", "COMPTABLE"]);
+  const { erreur, succes } = await searchParams;
   const [periodes, rapports] = await Promise.all([
     prisma.periode.findMany({ orderBy: { dateDebut: "desc" } }),
     prisma.rapport.findMany({ include: { periode: true }, orderBy: { dateGeneration: "desc" }, take: 50 }),
@@ -24,6 +33,16 @@ export default async function PageRapports() {
 
       <Reveal>
         <Card className="mb-6 max-w-xl">
+          {succes && (
+            <p className="mb-3 rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+              Rapport {succes} généré.
+            </p>
+          )}
+          {erreur && MESSAGES_ERREUR[erreur] && (
+            <p className="mb-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+              {MESSAGES_ERREUR[erreur]}
+            </p>
+          )}
           <form action={genererRapportAction} className="flex flex-wrap items-end gap-2">
             <Select name="periodeId" required className="w-auto">
               {periodes.map((p) => (

@@ -9,8 +9,19 @@ import { Input, Select } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/ui/Reveal";
 
-export default async function PageValidation() {
+const MESSAGES_ERREUR: Record<string, string> = {
+  pas_de_regle: "Aucune règle de validation active - configurez les paramètres d'abord.",
+  motif: "Le motif est obligatoire.",
+};
+
+export default async function PageValidation({
+  searchParams,
+}: {
+  searchParams: Promise<{ erreur?: string; succes?: string }>;
+}) {
   await exigerRole(["ADMIN"]);
+  const { erreur, succes } = await searchParams;
+  const [nbValides, nbAControler] = succes && succes.includes("-") ? succes.split("-").map(Number) : [null, null];
 
   const aControler = await prisma.cours.findMany({
     where: { statut: "A_CONTROLER" },
@@ -21,6 +32,22 @@ export default async function PageValidation() {
   return (
     <div>
       <PageHeader title="Validation" description="Application des règles et traitement des anomalies" />
+
+      {nbValides !== null && (
+        <p className="mb-4 max-w-3xl rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+          Règles appliquées : {nbValides} cours validé(s), {nbAControler} à contrôler.
+        </p>
+      )}
+      {succes === "anomalie_traitee" && (
+        <p className="mb-4 max-w-3xl rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+          Anomalie traitée.
+        </p>
+      )}
+      {erreur && MESSAGES_ERREUR[erreur] && (
+        <p className="mb-4 max-w-3xl rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+          {MESSAGES_ERREUR[erreur]}
+        </p>
+      )}
 
       <Reveal>
         <form action={appliquerReglesAction} className="mb-8">

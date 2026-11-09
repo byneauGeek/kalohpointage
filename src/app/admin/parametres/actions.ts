@@ -42,11 +42,14 @@ export async function enregistrerRegleValidation(formData: FormData) {
   });
 
   revalidatePath("/admin/parametres");
+  redirect("/admin/parametres?succes=regles");
 }
 
 export async function enregistrerNomEtablissement(formData: FormData) {
   const session = await exigerRole(["ADMIN"]);
   const valeur = String(formData.get("nomEtablissement") ?? "").trim();
+  if (!valeur) redirect("/admin/parametres?erreur=nom_vide");
+
   await prisma.parametre.upsert({
     where: { cle: "NOM_ETABLISSEMENT" },
     create: { cle: "NOM_ETABLISSEMENT", valeur },
@@ -54,6 +57,7 @@ export async function enregistrerNomEtablissement(formData: FormData) {
   });
   await enregistrerAudit({ utilisateurId: session.userId, action: "MODIFICATION_PARAMETRES", nouvelleValeur: valeur });
   revalidatePath("/admin/parametres");
+  redirect("/admin/parametres?succes=etablissement");
 }
 
 /** Cloture l'emploi du temps en cours pour archiver proprement une rentree
@@ -112,4 +116,5 @@ export async function genererJetonPointageAction() {
   });
 
   revalidatePath("/admin/parametres");
+  redirect("/admin/parametres?succes=jeton");
 }

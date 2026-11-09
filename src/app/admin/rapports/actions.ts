@@ -1,16 +1,21 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { exigerRole } from "@/lib/auth";
 import { genererRapport } from "@/lib/rapports";
 import { enregistrerAudit } from "@/lib/audit";
 
 export async function genererRapportAction(formData: FormData) {
   const session = await exigerRole(["ADMIN", "COMPTABLE"]);
+  const periodeId = Number(formData.get("periodeId"));
+  if (!periodeId) redirect("/admin/rapports?erreur=invalide");
+
   const { rapport } = await genererRapport({
-    periodeId: Number(formData.get("periodeId")),
+    periodeId,
     typeRapport: String(formData.get("typeRapport") ?? "MENSUEL"),
     utilisateurId: session.userId,
   });
+
   await enregistrerAudit({
     utilisateurId: session.userId,
     action: "GENERATION_RAPPORT",
@@ -19,4 +24,5 @@ export async function genererRapportAction(formData: FormData) {
     nouvelleValeur: `${rapport.numeroRapport} v${rapport.version}`,
   });
   revalidatePath("/admin/rapports");
+  redirect(`/admin/rapports?succes=${encodeURIComponent(rapport.numeroRapport)}-v${rapport.version}`);
 }

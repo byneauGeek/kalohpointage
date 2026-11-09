@@ -9,8 +9,23 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Reveal } from "@/components/ui/Reveal";
 
-export default async function PageUtilisateurs() {
+const MESSAGES_ERREUR: Record<string, string> = {
+  mdp_court: "Le mot de passe doit comporter au moins 8 caractères.",
+  identifiant_pris: "Cet identifiant est déjà utilisé.",
+  pin_invalide: "Le PIN doit comporter 4 à 8 chiffres.",
+};
+const MESSAGES_SUCCES: Record<string, string> = {
+  compte_cree: "Compte créé.",
+  pin_defini: "PIN défini.",
+};
+
+export default async function PageUtilisateurs({
+  searchParams,
+}: {
+  searchParams: Promise<{ erreur?: string; succes?: string }>;
+}) {
   await exigerRole(["ADMIN"]);
+  const { erreur, succes } = await searchParams;
   const [utilisateurs, professeurs] = await Promise.all([
     prisma.utilisateur.findMany({ where: { role: { in: ["ADMIN", "COMPTABLE"] } }, orderBy: { nomUtilisateur: "asc" } }),
     prisma.professeur.findMany({ where: { actif: true }, include: { utilisateur: true }, orderBy: { nom: "asc" } }),
@@ -19,6 +34,17 @@ export default async function PageUtilisateurs() {
   return (
     <div>
       <PageHeader title="Utilisateurs" description="Comptes d'administration et codes PIN des professeurs" />
+
+      {succes && MESSAGES_SUCCES[succes] && (
+        <p className="mb-4 max-w-xl rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+          {MESSAGES_SUCCES[succes]}
+        </p>
+      )}
+      {erreur && MESSAGES_ERREUR[erreur] && (
+        <p className="mb-4 max-w-xl rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+          {MESSAGES_ERREUR[erreur]}
+        </p>
+      )}
 
       <Reveal>
         <Card className="mb-8 max-w-xl">

@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { exigerRole } from "@/lib/auth";
 import { enregistrerAudit } from "@/lib/audit";
@@ -12,22 +13,30 @@ export async function creerProfesseur(formData: FormData) {
   const salaireFixe = formData.get("salaireFixeMensuel");
   const quota = formData.get("quotaHeuresMensuel");
 
-  const professeur = await prisma.professeur.create({
-    data: {
-      matricule: String(formData.get("matricule")).trim(),
-      nom: String(formData.get("nom")).trim(),
-      prenom: String(formData.get("prenom")).trim(),
-      telephone: String(formData.get("telephone") ?? "").trim() || null,
-      email: String(formData.get("email") ?? "").trim() || null,
-      statut: statut as "PERMANENT" | "VACATAIRE",
-      tauxHoraireSpecifique: formData.get("tauxHoraireSpecifique")
-        ? Number(formData.get("tauxHoraireSpecifique"))
-        : null,
-      salaireFixeMensuel: salaireFixe ? Number(salaireFixe) : null,
-      // quota saisi en heures a l'ecran, stocke en minutes
-      quotaHeuresMensuelMin: quota ? Math.round(Number(quota) * 60) : null,
-    },
-  });
+  let professeur;
+  try {
+    professeur = await prisma.professeur.create({
+      data: {
+        matricule: String(formData.get("matricule")).trim(),
+        nom: String(formData.get("nom")).trim(),
+        prenom: String(formData.get("prenom")).trim(),
+        telephone: String(formData.get("telephone") ?? "").trim() || null,
+        email: String(formData.get("email") ?? "").trim() || null,
+        statut: statut as "PERMANENT" | "VACATAIRE",
+        tauxHoraireSpecifique: formData.get("tauxHoraireSpecifique")
+          ? Number(formData.get("tauxHoraireSpecifique"))
+          : null,
+        salaireFixeMensuel: salaireFixe ? Number(salaireFixe) : null,
+        // quota saisi en heures a l'ecran, stocke en minutes
+        quotaHeuresMensuelMin: quota ? Math.round(Number(quota) * 60) : null,
+      },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      redirect("/admin/professeurs?erreur=matricule_existe");
+    }
+    throw e;
+  }
 
   await enregistrerAudit({
     utilisateurId: session.userId,
@@ -38,6 +47,7 @@ export async function creerProfesseur(formData: FormData) {
   });
 
   revalidatePath("/admin/professeurs");
+  redirect("/admin/professeurs?succes=cree");
 }
 
 export async function desactiverProfesseur(professeurId: number) {
@@ -50,6 +60,7 @@ export async function desactiverProfesseur(professeurId: number) {
     idEnregistrement: professeurId,
   });
   revalidatePath("/admin/professeurs");
+  redirect("/admin/professeurs?succes=desactive");
 }
 
 export async function modifierProfesseur(professeurId: number, formData: FormData) {
@@ -84,7 +95,7 @@ export async function modifierProfesseur(professeurId: number, formData: FormDat
   });
 
   revalidatePath("/admin/professeurs");
-  redirect("/admin/professeurs");
+  redirect("/admin/professeurs?succes=modifie");
 }
 
 export async function reactiverProfesseur(professeurId: number) {
@@ -97,4 +108,5 @@ export async function reactiverProfesseur(professeurId: number) {
     idEnregistrement: professeurId,
   });
   revalidatePath("/admin/professeurs");
+  redirect("/admin/professeurs?succes=reactive");
 }

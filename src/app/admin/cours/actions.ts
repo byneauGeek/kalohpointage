@@ -14,7 +14,7 @@ import { enregistrerAudit } from "@/lib/audit";
 export async function effectuerRapprochementAction() {
   const session = await exigerRole(["ADMIN"]);
   const regle = await prisma.regleValidation.findFirst({ where: { actif: true }, orderBy: { dateApplication: "desc" } });
-  if (!regle) throw new Error("Aucune regle de validation active - configurez les parametres d'abord.");
+  if (!regle) redirect("/admin/cours?erreurRapprochement=pas_de_regle");
 
   const resultat = await effectuerRapprochement({ delaiAbsenceMin: regle.delaiAbsenceMin });
   await enregistrerAudit({
@@ -23,6 +23,7 @@ export async function effectuerRapprochementAction() {
     motif: `${resultat.nbAbsents} absences, ${resultat.nbIncomplets} incomplets`,
   });
   revalidatePath("/admin/cours");
+  redirect(`/admin/cours?succesRapprochement=${resultat.nbAbsents}-${resultat.nbIncomplets}`);
 }
 
 /** Supprime les cours (generes par erreur, doublons, test...) sur une plage

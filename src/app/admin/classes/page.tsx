@@ -9,8 +9,18 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { Reveal } from "@/components/ui/Reveal";
 
-export default async function PageClasses() {
+const MESSAGES_ERREUR: Record<string, string> = {
+  vide: "Saisissez au moins un nom de classe.",
+};
+
+export default async function PageClasses({
+  searchParams,
+}: {
+  searchParams: Promise<{ erreur?: string; succes?: string }>;
+}) {
   const session = await exigerRole(["ADMIN", "COMPTABLE"]);
+  const { erreur, succes } = await searchParams;
+  const [nbCreees, nbExistantes] = succes ? succes.split("-").map(Number) : [0, 0];
   const classes = await prisma.classe.findMany({ orderBy: { nomClasse: "asc" } });
 
   return (
@@ -24,6 +34,16 @@ export default async function PageClasses() {
             <p className="mb-3 text-sm text-[var(--color-navy-900)]/55">
               Un nom de classe par ligne (ou séparés par des virgules). Une classe déjà existante n&apos;est jamais modifiée.
             </p>
+            {succes && (
+              <p className="mb-3 rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+                {nbCreees} classe(s) créée(s){nbExistantes > 0 ? `, ${nbExistantes} déjà existante(s) ignorée(s)` : ""}.
+              </p>
+            )}
+            {erreur && MESSAGES_ERREUR[erreur] && (
+              <p className="mb-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+                {MESSAGES_ERREUR[erreur]}
+              </p>
+            )}
             <form action={creerClassesEnMasse}>
               <Textarea name="noms" required rows={4} placeholder={"6è1\n6è2\n2ndeA1"} className="mb-3" />
               <Label>Niveau (optionnel)</Label>

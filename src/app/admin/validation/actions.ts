@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { exigerRole } from "@/lib/auth";
@@ -10,7 +11,7 @@ import { notifierAnomaliesATraiter } from "@/lib/notifications";
 export async function appliquerReglesAction() {
   const session = await exigerRole(["ADMIN"]);
   const regle = await prisma.regleValidation.findFirst({ where: { actif: true }, orderBy: { dateApplication: "desc" } });
-  if (!regle) throw new Error("Aucune regle de validation active.");
+  if (!regle) redirect("/admin/validation?erreur=pas_de_regle");
 
   const resultat = await appliquerReglesValidation(regle);
   await enregistrerAudit({
@@ -24,16 +25,22 @@ export async function appliquerReglesAction() {
   await notifierAnomaliesATraiter(resultat.nbAControler, origine);
 
   revalidatePath("/admin/validation");
+  redirect(`/admin/validation?succes=${resultat.nbValides}-${resultat.nbAControler}`);
 }
 
 export async function resoudreAnomalieAction(formData: FormData) {
   const session = await exigerRole(["ADMIN"]);
+  const coursId = Number(formData.get("coursId"));
+  const motif = String(formData.get("motif") ?? "").trim();
+  if (!motif) redirect(`/admin/validation?erreur=motif&coursId=${coursId}`);
+
   await traiterAnomalie({
-    coursId: Number(formData.get("coursId")),
+    coursId,
     decision: String(formData.get("decision")) as "VALIDER" | "REJETER",
     dureeValideeMin: formData.get("dureeValideeMin") ? Number(formData.get("dureeValideeMin")) : undefined,
-    motif: String(formData.get("motif") ?? ""),
+    motif,
     utilisateurId: session.userId,
   });
   revalidatePath("/admin/validation");
+  redirect("/admin/validation?succes=anomalie_traitee");
 }

@@ -1,19 +1,25 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { exigerRole } from "@/lib/auth";
 import { enregistrerAudit } from "@/lib/audit";
 
 export async function creerPeriode(formData: FormData) {
   await exigerRole(["ADMIN"]);
-  await prisma.periode.create({
-    data: {
-      libelle: String(formData.get("libelle")).trim(),
-      dateDebut: new Date(String(formData.get("dateDebut"))),
-      dateFin: new Date(String(formData.get("dateFin"))),
-    },
-  });
+  const libelle = String(formData.get("libelle") ?? "").trim();
+  const dateDebut = new Date(String(formData.get("dateDebut")));
+  const dateFin = new Date(String(formData.get("dateFin")));
+  if (!libelle || Number.isNaN(dateDebut.getTime()) || Number.isNaN(dateFin.getTime())) {
+    redirect("/admin/periodes?erreur=invalide");
+  }
+  if (dateFin < dateDebut) {
+    redirect("/admin/periodes?erreur=ordre");
+  }
+
+  await prisma.periode.create({ data: { libelle, dateDebut, dateFin } });
   revalidatePath("/admin/periodes");
+  redirect("/admin/periodes?succes=creee");
 }
 
 export async function cloturerPeriode(periodeId: number) {
@@ -25,7 +31,7 @@ export async function cloturerPeriode(periodeId: number) {
     where: { dateCours: { gte: periode.dateDebut, lte: periode.dateFin }, statut: "A_CONTROLER" },
   });
   if (anomalies > 0) {
-    throw new Error("Impossible de clôturer : des anomalies restent non traitées.");
+    redirect(`/admin/periodes?erreur=anomalies&periodeId=${periodeId}`);
   }
 
   const regle = await prisma.regleValidation.findFirst({ where: { actif: true }, orderBy: { dateApplication: "desc" } });
@@ -48,13 +54,14 @@ export async function cloturerPeriode(periodeId: number) {
 
   await enregistrerAudit({ utilisateurId: session.userId, action: "CLOTURE_PERIODE", tableConcernee: "periodes", idEnregistrement: periodeId });
   revalidatePath("/admin/periodes");
+  redirect("/admin/periodes?succes=cloturee");
 }
 
 export async function reouvrirPeriode(formData: FormData) {
   const session = await exigerRole(["ADMIN"]);
   const periodeId = Number(formData.get("periodeId"));
   const motif = String(formData.get("motif") ?? "").trim();
-  if (!motif) throw new Error("Motif obligatoire pour une réouverture.");
+  if (!motif) redirect("/admin/periodes?erreur=motif");
 
   await prisma.periode.update({
     where: { id: periodeId },
@@ -68,4 +75,5 @@ export async function reouvrirPeriode(formData: FormData) {
     motif,
   });
   revalidatePath("/admin/periodes");
+  redirect("/admin/periodes?succes=reouverte");
 }

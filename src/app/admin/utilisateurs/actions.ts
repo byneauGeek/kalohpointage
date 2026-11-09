@@ -1,5 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { exigerRole } from "@/lib/auth";
 import { hashSecret } from "@/lib/crypto";
@@ -8,17 +10,25 @@ import { enregistrerAudit } from "@/lib/audit";
 export async function creerCompteAdminOuComptable(formData: FormData) {
   const session = await exigerRole(["ADMIN"]);
   const motDePasse = String(formData.get("motDePasse") ?? "");
-  if (motDePasse.length < 8) throw new Error("Le mot de passe doit comporter au moins 8 caractères.");
+  if (motDePasse.length < 8) redirect("/admin/utilisateurs?erreur=mdp_court");
 
   const { hash, sel } = await hashSecret(motDePasse);
-  const utilisateur = await prisma.utilisateur.create({
-    data: {
-      role: String(formData.get("role")) as "ADMIN" | "COMPTABLE",
-      nomUtilisateur: String(formData.get("nomUtilisateur")).trim(),
-      motDePasseHash: hash,
-      motDePasseSel: sel,
-    },
-  });
+  let utilisateur;
+  try {
+    utilisateur = await prisma.utilisateur.create({
+      data: {
+        role: String(formData.get("role")) as "ADMIN" | "COMPTABLE",
+        nomUtilisateur: String(formData.get("nomUtilisateur")).trim(),
+        motDePasseHash: hash,
+        motDePasseSel: sel,
+      },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      redirect("/admin/utilisateurs?erreur=identifiant_pris");
+    }
+    throw e;
+  }
 
   await enregistrerAudit({
     utilisateurId: session.userId,
@@ -28,6 +38,7 @@ export async function creerCompteAdminOuComptable(formData: FormData) {
     nouvelleValeur: utilisateur.nomUtilisateur ?? undefined,
   });
   revalidatePath("/admin/utilisateurs");
+  redirect("/admin/utilisateurs?succes=compte_cree");
 }
 
 /** Definir/redefinir le PIN d'un professeur - indispensable pour qu'il
@@ -36,7 +47,7 @@ export async function definirPinProfesseur(formData: FormData) {
   const session = await exigerRole(["ADMIN"]);
   const professeurId = Number(formData.get("professeurId"));
   const pin = String(formData.get("pin") ?? "");
-  if (!/^\d{4,8}$/.test(pin)) throw new Error("Le PIN doit comporter 4 à 8 chiffres.");
+  if (!/^\d{4,8}$/.test(pin)) redirect("/admin/utilisateurs?erreur=pin_invalide");
 
   const { hash, sel } = await hashSecret(pin);
 
@@ -53,4 +64,5 @@ export async function definirPinProfesseur(formData: FormData) {
     idEnregistrement: professeurId,
   });
   revalidatePath("/admin/utilisateurs");
+  redirect("/admin/utilisateurs?succes=pin_defini");
 }

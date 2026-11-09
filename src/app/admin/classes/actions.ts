@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { exigerRole } from "@/lib/auth";
 import { enregistrerAudit } from "@/lib/audit";
@@ -14,6 +15,8 @@ export async function creerClassesEnMasse(formData: FormData) {
     .map((n) => n.trim())
     .filter((n) => n !== "");
   const niveau = String(formData.get("niveau") ?? "").trim() || null;
+
+  if (noms.length === 0) redirect("/admin/classes?erreur=vide");
 
   const existantes = await prisma.classe.findMany({ where: { nomClasse: { in: noms } }, select: { nomClasse: true } });
   const existantesSet = new Set(existantes.map((c) => c.nomClasse));
@@ -30,4 +33,5 @@ export async function creerClassesEnMasse(formData: FormData) {
   }
 
   revalidatePath("/admin/classes");
+  redirect(`/admin/classes?succes=${aCreer.length}-${existantesSet.size}`);
 }

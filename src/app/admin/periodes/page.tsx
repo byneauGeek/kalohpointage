@@ -9,14 +9,42 @@ import { Button } from "@/components/ui/Button";
 import { StatutBadge } from "@/components/ui/Badge";
 import { Reveal } from "@/components/ui/Reveal";
 
-export default async function PagePeriodes() {
+const MESSAGES_ERREUR: Record<string, string> = {
+  invalide: "Libellé et dates obligatoires.",
+  ordre: "La date de fin doit être postérieure à la date de début.",
+  anomalies: "Impossible de clôturer : des anomalies restent non traitées (voir Validation).",
+  motif: "Le motif de réouverture est obligatoire.",
+};
+const MESSAGES_SUCCES: Record<string, string> = {
+  creee: "Période créée.",
+  cloturee: "Période clôturée.",
+  reouverte: "Période rouverte.",
+};
+
+export default async function PagePeriodes({
+  searchParams,
+}: {
+  searchParams: Promise<{ erreur?: string; succes?: string }>;
+}) {
   const session = await exigerRole(["ADMIN", "COMPTABLE"]);
   const estAdmin = session.role === "ADMIN";
+  const { erreur, succes } = await searchParams;
   const periodes = await prisma.periode.findMany({ orderBy: { dateDebut: "desc" } });
 
   return (
     <div>
       <PageHeader title="Périodes" description="Cycles de paie, clôture et réouverture" />
+
+      {succes && MESSAGES_SUCCES[succes] && (
+        <p className="mb-4 max-w-3xl rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+          {MESSAGES_SUCCES[succes]}
+        </p>
+      )}
+      {erreur && MESSAGES_ERREUR[erreur] && (
+        <p className="mb-4 max-w-3xl rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+          {MESSAGES_ERREUR[erreur]}
+        </p>
+      )}
 
       {estAdmin && (
         <Reveal>
