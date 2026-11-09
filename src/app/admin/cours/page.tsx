@@ -1,19 +1,30 @@
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, Trash2 } from "lucide-react";
 import { exigerRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatMinutes } from "@/lib/heureUtils";
-import { effectuerRapprochementAction } from "./actions";
+import { effectuerRapprochementAction, supprimerCoursAction } from "./actions";
 import GenererCoursForm from "./GenererCoursForm";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Card } from "@/components/ui/Card";
+import { Card, CardTitle } from "@/components/ui/Card";
+import { Input, Label } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { StatutBadge } from "@/components/ui/Badge";
 import { Table, Thead, Th, Tr, Td, EmptyState } from "@/components/ui/Table";
 import { Reveal } from "@/components/ui/Reveal";
 
-export default async function PageCours({ searchParams }: { searchParams: Promise<{ statut?: string }> }) {
+const MESSAGES_ERREUR_SUPPRESSION: Record<string, string> = {
+  confirmation: 'Suppression annulée : vous devez taper exactement "CONFIRMER".',
+  date: "Dates invalides.",
+  ordre: "La date de fin doit être postérieure ou égale à la date de début.",
+};
+
+export default async function PageCours({
+  searchParams,
+}: {
+  searchParams: Promise<{ statut?: string; erreurSuppression?: string; succesSuppression?: string }>;
+}) {
   const session = await exigerRole(["ADMIN", "COMPTABLE"]);
-  const { statut } = await searchParams;
+  const { statut, erreurSuppression, succesSuppression } = await searchParams;
 
   const cours = await prisma.cours.findMany({
     where: statut ? { statut: statut as never } : undefined,
@@ -40,6 +51,48 @@ export default async function PageCours({ searchParams }: { searchParams: Promis
               </form>
             </Card>
           </div>
+        </Reveal>
+      )}
+
+      {session.role === "ADMIN" && (
+        <Reveal delay={0.04}>
+          <Card padded className="mb-6 max-w-2xl">
+            <CardTitle>Supprimer des cours</CardTitle>
+            <p className="mb-3 text-sm text-[var(--color-navy-900)]/55">
+              Supprime les cours non validés (générés par erreur, doublons, essai) sur une plage de dates. Les cours
+              déjà validés (pris en compte dans la paie) ne sont jamais supprimés.
+            </p>
+
+            {succesSuppression && (
+              <p className="mb-3 rounded-lg bg-[var(--color-success-bg)] px-3 py-2 text-sm text-[var(--color-success)]">
+                {succesSuppression} cours non validé(s) supprimé(s).
+              </p>
+            )}
+            {erreurSuppression && MESSAGES_ERREUR_SUPPRESSION[erreurSuppression] && (
+              <p className="mb-3 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">
+                {MESSAGES_ERREUR_SUPPRESSION[erreurSuppression]}
+              </p>
+            )}
+
+            <form action={supprimerCoursAction} className="flex flex-wrap items-end gap-2">
+              <div>
+                <Label>Du</Label>
+                <Input type="date" name="dateDebut" required />
+              </div>
+              <div>
+                <Label>Au</Label>
+                <Input type="date" name="dateFin" required />
+              </div>
+              <div>
+                <Label>Tapez CONFIRMER</Label>
+                <Input name="confirmation" placeholder="CONFIRMER" required className="w-40" />
+              </div>
+              <Button type="submit" variant="outline" size="sm" className="text-[var(--color-danger)]">
+                <Trash2 size={14} />
+                Supprimer
+              </Button>
+            </form>
+          </Card>
         </Reveal>
       )}
 
