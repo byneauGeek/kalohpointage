@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { lireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { parseHeureFrancaise } from "@/lib/heureUtils";
@@ -41,6 +42,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ erreur: "Lignes manquantes." }, { status: 400 });
   }
 
+  // Resolution des classes en un seul aller-retour : le formulaire propose
+  // les noms reels via une datalist, donc le cas courant (texte = nom exact
+  // d'une classe existante) se resout entierement depuis cette liste, sans
+  // requete supplementaire par ligne. Avant ce cache, chaque ligne appelait
+  // trouverIdClasse() separement (1 requete/ligne), ce qui rendait
+  // l'enregistrement d'un emploi du temps complet tres lent (autant de
+  // aller-retours reseau que de creneaux, en serie).
+  const toutesClasses = await prisma.classe.findMany({ select: { id: true, nomClasse: true } });
+  const idClasseParNomExact = new Map(toutesClasses.map((c) => [c.nomClasse, c.id]));
+
   const erreurs: string[] = [];
   const resolues: LigneResolue[] = [];
 
@@ -70,10 +81,14 @@ export async function POST(request: Request) {
       erreurs.push(`Ligne ${r} : classe obligatoire.`);
       continue;
     }
-    const resultatClasse = await trouverIdClasse(prisma, classeTexte);
-    if (!resultatClasse.trouve) {
-      erreurs.push(`Ligne ${r} : ${resultatClasse.motif}`);
-      continue;
+    let idClasse = idClasseParNomExact.get(classeTexte);
+    if (idClasse === undefined) {
+      const resultatClasse = await trouverIdClasse(prisma, classeTexte);
+      if (!resultatClasse.trouve) {
+        erreurs.push(`Ligne ${r} : ${resultatClasse.motif}`);
+        continue;
+      }
+      idClasse = resultatClasse.idClasse;
     }
     resolues.push({
       id: l.id,
@@ -81,7 +96,7 @@ export async function POST(request: Request) {
       matiereId: l.matiereId,
       heureDebutMin,
       heureFinMin,
-      classeId: resultatClasse.idClasse,
+      classeId: idClasse,
     });
   }
 
@@ -103,40 +118,53 @@ export async function POST(request: Request) {
   }
 
   const idsConserves = resolues.filter((l) => l.id).map((l) => l.id as number);
+  const aCreer = resolues.filter((l) => !l.id);
+  const aMettreAJour = resolues.filter((l) => l.id);
 
+  // Un aller-retour par ligne (update puis create, en serie) rendait
+  // l'enregistrement tres lent dès qu'un professeur avait plus de quelques
+  // creneaux. Desormais : au plus 3 aller-retours au total, quel que soit le
+  // nombre de creneaux - createMany pour les nouvelles lignes, et un UPDATE
+  // groupe (FROM VALUES) pour les lignes existantes, chacune avec ses
+  // propres valeurs en un seul passage.
   await prisma.$transaction(async (tx) => {
     await tx.emploiDuTemps.updateMany({
       where: { professeurId, actif: true, id: idsConserves.length > 0 ? { notIn: idsConserves } : undefined },
       data: { actif: false },
     });
 
-    for (const l of resolues) {
-      if (l.id) {
-        await tx.emploiDuTemps.update({
-          where: { id: l.id },
-          data: {
-            jourSemaine: l.jourSemaine,
-            matiereId: l.matiereId,
-            heureDebutMin: l.heureDebutMin,
-            heureFinMin: l.heureFinMin,
-            classeId: l.classeId,
-            actif: true,
-          },
-        });
-      } else {
-        await tx.emploiDuTemps.create({
-          data: {
-            professeurId,
-            jourSemaine: l.jourSemaine,
-            matiereId: l.matiereId,
-            heureDebutMin: l.heureDebutMin,
-            heureFinMin: l.heureFinMin,
-            classeId: l.classeId,
-            dateDebutValidite: new Date(),
-            dateImport: new Date(),
-          },
-        });
-      }
+    if (aCreer.length > 0) {
+      await tx.emploiDuTemps.createMany({
+        data: aCreer.map((l) => ({
+          professeurId,
+          jourSemaine: l.jourSemaine,
+          matiereId: l.matiereId,
+          heureDebutMin: l.heureDebutMin,
+          heureFinMin: l.heureFinMin,
+          classeId: l.classeId,
+          dateDebutValidite: new Date(),
+          dateImport: new Date(),
+        })),
+      });
+    }
+
+    if (aMettreAJour.length > 0) {
+      await tx.$executeRaw`
+        UPDATE emplois_du_temps AS e
+        SET "jourSemaine" = v."jourSemaine",
+            "matiereId" = v."matiereId",
+            "heureDebutMin" = v."heureDebutMin",
+            "heureFinMin" = v."heureFinMin",
+            "classeId" = v."classeId",
+            actif = true
+        FROM (VALUES ${Prisma.join(
+          aMettreAJour.map(
+            (l) =>
+              Prisma.sql`(${l.id}::int, ${l.jourSemaine}::int, ${l.matiereId}::int, ${l.heureDebutMin}::int, ${l.heureFinMin}::int, ${l.classeId}::int)`
+          )
+        )}) AS v(id, "jourSemaine", "matiereId", "heureDebutMin", "heureFinMin", "classeId")
+        WHERE e.id = v.id
+      `;
     }
   });
 
