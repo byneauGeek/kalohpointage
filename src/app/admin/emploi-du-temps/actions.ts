@@ -39,10 +39,14 @@ export async function modifierCreneau(creneauId: number, formData: FormData) {
     redirect(`/admin/emploi-du-temps/${creneauId}?erreur=classe_inconnue`);
   }
 
+  // Un professeur peut avoir plusieurs classes en simultane sur le meme
+  // creneau (ex. 3e1/3e2/3e3 en meme temps) : seul un chevauchement sur LA
+  // MEME classe est une vraie erreur (double saisie du meme creneau).
   const chevauchement = await prisma.emploiDuTemps.findFirst({
     where: {
       id: { not: creneauId },
       professeurId: creneau.professeurId,
+      classeId: resultatClasse.idClasse,
       jourSemaine: numJour,
       actif: true,
       heureDebutMin: { lt: heureFinMin },

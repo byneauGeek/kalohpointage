@@ -178,9 +178,14 @@ export async function importerEmploiDuTemps(params: {
         continue;
       }
 
+      // Un professeur peut avoir plusieurs classes en simultane sur le meme
+      // creneau (ex. "3e1 et 3e2" eclate par eclaterClassesCombinees, ou
+      // simplement deux lignes distinctes du fichier) : seul un
+      // chevauchement sur LA MEME classe est une vraie erreur.
       const chevauchement = await prisma.emploiDuTemps.findFirst({
         where: {
           professeurId: params.professeurId,
+          classeId: resultat.idClasse,
           jourSemaine: numJour,
           actif: true,
           heureDebutMin: { lt: heureFinMin },

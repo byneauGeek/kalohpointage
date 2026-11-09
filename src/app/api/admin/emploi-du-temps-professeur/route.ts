@@ -102,13 +102,21 @@ export async function POST(request: Request) {
 
   // Chevauchements entre les lignes soumises elles-memes (meme jour, plages
   // qui se recouvrent) - l'envoi remplace tout l'emploi du temps actif du
-  // professeur, donc seule la coherence interne de l'ensemble compte.
+  // professeur, donc seule la coherence interne de l'ensemble compte. Un
+  // professeur peut avoir plusieurs classes en simultane sur le meme
+  // creneau (ex. 3e1/3e2/3e3 en meme temps) : seul un chevauchement sur LA
+  // MEME classe est une vraie erreur (double saisie du meme creneau).
   for (let i = 0; i < resolues.length; i++) {
     for (let j = i + 1; j < resolues.length; j++) {
       const a = resolues[i];
       const b = resolues[j];
-      if (a.jourSemaine === b.jourSemaine && a.heureDebutMin < b.heureFinMin && a.heureFinMin > b.heureDebutMin) {
-        erreurs.push(`Les lignes ${i + 1} et ${j + 1} se chevauchent (même jour, horaires qui se recouvrent).`);
+      if (
+        a.jourSemaine === b.jourSemaine &&
+        a.classeId === b.classeId &&
+        a.heureDebutMin < b.heureFinMin &&
+        a.heureFinMin > b.heureDebutMin
+      ) {
+        erreurs.push(`Les lignes ${i + 1} et ${j + 1} se chevauchent sur la même classe (même jour, horaires qui se recouvrent).`);
       }
     }
   }

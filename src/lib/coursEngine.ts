@@ -51,7 +51,7 @@ export async function genererCoursPeriode(dateDebut: Date, dateFin: Date) {
     WHERE j::date NOT IN (
       SELECT "dateJour"::date FROM "jours_non_ouvres" WHERE "dateJour" BETWEEN ${debut}::timestamp AND ${fin}::timestamp
     )
-    ON CONFLICT ("professeurId", "dateCours", "heureDebutPrevueMin") DO NOTHING
+    ON CONFLICT ("professeurId", "dateCours", "heureDebutPrevueMin", "classeId") DO NOTHING
   `;
 
   return { nbCrees, nbIgnores: Number(total) - nbCrees };

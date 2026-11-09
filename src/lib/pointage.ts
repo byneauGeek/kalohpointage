@@ -74,15 +74,23 @@ type CoursAvecRelations = Cours & { classe: Classe; matiere: Matiere };
 
 /** A partir d'une liste de cours du jour (meme statut), DEJA TRIEE par
  * heureDebutPrevueMin croissant et COMMENCANT au cours de depart, retourne
- * le plus long prefixe contigu (chaque cours commence pile a l'heure ou le
- * precedent finit). */
+ * le plus long prefixe "sans redescendre" : chaque cours suivant commence
+ * au plus tard a l'heure ou la couverture du bloc (le plus tardif des
+ * heureFinPrevueMin deja inclus) se termine - ce qui couvre aussi bien les
+ * cours enchaines (commence pile quand le precedent finit) que plusieurs
+ * classes en simultane sur le meme creneau (un professeur peut avoir 2 ou 3
+ * classes en meme temps, ex. 3e1/3e2/3e3 - voir emploi du temps), qui
+ * partagent alors le meme pointage d'arrivee/fin. Des qu'un vrai ecart
+ * (heure creuse) apparait, le bloc s'arrete. */
 export function blocContigu(coursDepartEtSuivants: CoursAvecRelations[]): CoursAvecRelations[] {
   if (coursDepartEtSuivants.length === 0) return [];
   const bloc = [coursDepartEtSuivants[0]];
+  let finCouverte = coursDepartEtSuivants[0].heureFinPrevueMin;
   for (let i = 1; i < coursDepartEtSuivants.length; i++) {
-    const precedent = bloc[bloc.length - 1];
-    if (coursDepartEtSuivants[i].heureDebutPrevueMin === precedent.heureFinPrevueMin) {
-      bloc.push(coursDepartEtSuivants[i]);
+    const suivant = coursDepartEtSuivants[i];
+    if (suivant.heureDebutPrevueMin <= finCouverte) {
+      bloc.push(suivant);
+      finCouverte = Math.max(finCouverte, suivant.heureFinPrevueMin);
     } else {
       break;
     }
