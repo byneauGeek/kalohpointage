@@ -101,6 +101,8 @@ model Professeur {
   emploisDuTemps EmploiDuTemps[]
   cours          Cours[]
   saisiesManuelles SaisieHeuresManuelle[]
+  affectations   AffectationEnseignement[]
+  indisponibilites IndisponibiliteProfesseur[]
 
   @@map("professeurs")
 }
@@ -113,6 +115,7 @@ model Classe {
 
   emploisDuTemps EmploiDuTemps[]
   cours          Cours[]
+  affectations   AffectationEnseignement[]
 
   @@map("classes")
 }
@@ -124,8 +127,82 @@ model Matiere {
 
   emploisDuTemps EmploiDuTemps[]
   cours          Cours[]
+  affectations   AffectationEnseignement[]
+  periodesEvitees MatierePeriodeEvitee[]
 
   @@map("matieres")
+}
+
+/** Decoupage horaire de l'etablissement (sonnerie) : liste ordonnee des
+ * periodes de cours, rendue explicite et modifiable plutot que de rester
+ * implicite dans chaque ligne d'EmploiDuTemps (voir reflexion du generateur
+ * automatique, Journal_Decisions). Sert de "grille" de creneaux possibles au
+ * generateur ainsi qu'aux ecrans d'indisponibilite. */
+model PeriodeGrille {
+  id            Int     @id @default(autoincrement())
+  ordre         Int
+  libelle       String
+  heureDebutMin Int
+  heureFinMin   Int
+  actif         Boolean @default(true)
+
+  indisponibilites IndisponibiliteProfesseur[]
+  matieresEvitees  MatierePeriodeEvitee[]
+
+  @@map("periodes_grille")
+}
+
+/** Qui enseigne quoi a qui, et combien de seances par semaine - entree du
+ * generateur automatique d'emploi du temps (le quota a placer). Une seance =
+ * une periode de PeriodeGrille (pas de notion de bloc dans cette premiere
+ * version). Un seul professeur par (classe, matiere) actif a la fois. */
+model AffectationEnseignement {
+  id                Int        @id @default(autoincrement())
+  classe            Classe     @relation(fields: [classeId], references: [id])
+  classeId          Int
+  matiere           Matiere    @relation(fields: [matiereId], references: [id])
+  matiereId         Int
+  professeur        Professeur @relation(fields: [professeurId], references: [id])
+  professeurId      Int
+  seancesParSemaine Int
+  actif             Boolean    @default(true)
+  dateCreation      DateTime   @default(now())
+  dateModification  DateTime?  @updatedAt
+
+  @@unique([classeId, matiereId])
+  @@map("affectations_enseignement")
+}
+
+/** Indisponibilite recurrente hebdomadaire d'un professeur (jour + periode) -
+ * contrainte dure du generateur automatique : jamais place un professeur sur
+ * un de ces creneaux. Distinct d'une absence datee (conge, maladie), hors
+ * perimetre ici - coherent avec EmploiDuTemps qui est deja un modele
+ * hebdomadaire recurrent, pas date. */
+model IndisponibiliteProfesseur {
+  id              Int           @id @default(autoincrement())
+  professeur      Professeur    @relation(fields: [professeurId], references: [id])
+  professeurId    Int
+  jourSemaine     Int           // 1=Lundi ... 7=Dimanche
+  periodeGrille   PeriodeGrille @relation(fields: [periodeGrilleId], references: [id])
+  periodeGrilleId Int
+  motif           String?
+
+  @@unique([professeurId, jourSemaine, periodeGrilleId])
+  @@map("indisponibilites_professeur")
+}
+
+/** Periodes a eviter pour une matiere, tous jours confondus (ex. jamais en
+ * derniere periode) - contrainte souple du generateur automatique, prise en
+ * compte dans le score de placement mais jamais garantie. */
+model MatierePeriodeEvitee {
+  id              Int           @id @default(autoincrement())
+  matiere         Matiere       @relation(fields: [matiereId], references: [id])
+  matiereId       Int
+  periodeGrille   PeriodeGrille @relation(fields: [periodeGrilleId], references: [id])
+  periodeGrilleId Int
+
+  @@unique([matiereId, periodeGrilleId])
+  @@map("matieres_periodes_evitees")
 }
 
 model EmploiDuTemps {

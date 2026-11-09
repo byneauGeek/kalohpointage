@@ -53,6 +53,29 @@ async function main() {
     });
     console.log("Regle de validation par defaut creee (taux horaire a configurer dans Parametres).");
   }
+
+  const grilleExistante = await prisma.periodeGrille.count();
+  if (grilleExistante === 0) {
+    // Decoupage detecte dans les emplois du temps deja importes (identique
+    // chaque jour, lundi-vendredi) : 9 periodes de 55 min, recreation a 10h30
+    // et pause dejeuner a 12h20 - modifiable ensuite depuis l'admin si la
+    // sonnerie de l'etablissement change.
+    const periodes: [number, string, number, number][] = [
+      [1, "P1", 450, 505],
+      [2, "P2", 505, 560],
+      [3, "P3", 560, 615],
+      [4, "P4", 630, 685],
+      [5, "P5", 685, 740],
+      [6, "P6", 800, 855],
+      [7, "P7", 855, 910],
+      [8, "P8", 910, 965],
+      [9, "P9", 965, 1020],
+    ];
+    await prisma.periodeGrille.createMany({
+      data: periodes.map(([ordre, libelle, heureDebutMin, heureFinMin]) => ({ ordre, libelle, heureDebutMin, heureFinMin })),
+    });
+    console.log("Grille horaire par defaut creee (9 periodes, voir /admin pour la modifier).");
+  }
 }
 
 main()

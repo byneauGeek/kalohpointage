@@ -1,4 +1,5 @@
-import { Pencil } from "lucide-react";
+import { Pencil, Wand2, CalendarRange, Users, Ban } from "lucide-react";
+import Link from "next/link";
 import { exigerRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatMinutes } from "@/lib/heureUtils";
@@ -55,6 +56,36 @@ export default async function PageEmploiDuTemps({
               Tous les créneaux d&apos;un professeur sur un seul écran, modifiables en une fois.
             </p>
             <ProfesseurSelector professeurs={professeurs.map((p) => ({ id: p.id, label: `${p.nom} ${p.prenom} (${p.matricule})` }))} />
+          </Card>
+        </Reveal>
+      )}
+
+      {session.role === "ADMIN" && (
+        <Reveal delay={0.02}>
+          <Card className="mb-6 max-w-2xl">
+            <CardTitle>Générateur automatique</CardTitle>
+            <p className="mb-3 text-sm text-[var(--color-navy-900)]/55">
+              Configure qui enseigne quoi, les indisponibilités et la grille horaire, puis génère l&apos;emploi du
+              temps sans conflit.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/admin/emploi-du-temps/grille-horaire" className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-navy-900)]/15 px-3 py-1.5 text-sm font-medium text-[var(--color-navy-800)] hover:bg-[var(--color-navy-900)]/5">
+                <CalendarRange size={15} />
+                Grille horaire
+              </Link>
+              <Link href="/admin/emploi-du-temps/affectations" className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-navy-900)]/15 px-3 py-1.5 text-sm font-medium text-[var(--color-navy-800)] hover:bg-[var(--color-navy-900)]/5">
+                <Users size={15} />
+                Affectations
+              </Link>
+              <Link href="/admin/emploi-du-temps/indisponibilites" className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--color-navy-900)]/15 px-3 py-1.5 text-sm font-medium text-[var(--color-navy-800)] hover:bg-[var(--color-navy-900)]/5">
+                <Ban size={15} />
+                Indisponibilités
+              </Link>
+              <Link href="/admin/emploi-du-temps/generateur" className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-navy-800)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[var(--color-navy-700)]">
+                <Wand2 size={15} />
+                Générer
+              </Link>
+            </div>
           </Card>
         </Reveal>
       )}
