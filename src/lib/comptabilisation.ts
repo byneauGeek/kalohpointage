@@ -202,6 +202,28 @@ export async function detailSessionsProfesseur(
   return { sessions, parMatiere, manuelles };
 }
 
+/** Matiere(s) exactes d'un professeur sur une plage de dates : celles de ses
+ * Cours valides, et celles de ses saisies manuelles qui en precisent une
+ * (voir src/app/admin/heures-manuelles - seule source de matiere possible
+ * pour un professeur sans Cours ni EmploiDuTemps, puisque les heures
+ * manuelles n'ont pas d'autre lien vers une classe/matiere). Utilisee par la
+ * fiche d'emargement avant de retomber sur matieresEnseigneesProfesseur
+ * (emploi du temps, moins precis car pas specifique a la periode). */
+export async function matieresExactesProfesseur(professeurId: number, dateDebut: Date, dateFin: Date): Promise<string[]> {
+  const [cours, saisies] = await Promise.all([
+    prisma.cours.findMany({
+      where: { professeurId, statut: "VALIDE", dateCours: { gte: dateDebut, lte: dateFin } },
+      select: { matiere: { select: { libelle: true } } },
+    }),
+    prisma.saisieHeuresManuelle.findMany({
+      where: { professeurId, matiereId: { not: null }, date: { gte: dateDebut, lte: dateFin } },
+      select: { matiere: { select: { libelle: true } } },
+    }),
+  ]);
+  const libelles = [...cours.map((c) => c.matiere.libelle), ...saisies.map((s) => s.matiere!.libelle)];
+  return Array.from(new Set(libelles));
+}
+
 /** Matiere(s) qu'un professeur est cense enseigner sur une plage de dates,
  * d'apres son emploi du temps actif (et non les Cours valides, qui peuvent
  * etre absents quand les heures sont uniquement suivies via la saisie

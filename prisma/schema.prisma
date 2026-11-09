@@ -129,6 +129,7 @@ model Matiere {
   cours          Cours[]
   affectations   AffectationEnseignement[]
   periodesEvitees MatierePeriodeEvitee[]
+  saisiesManuelles SaisieHeuresManuelle[]
 
   @@map("matieres")
 }
@@ -325,6 +326,8 @@ model SaisieHeuresManuelle {
   heureArriveeMin Int      // minutes depuis minuit
   heureDepartMin  Int      // minutes depuis minuit, > heureArriveeMin
   dureeMin        Int      // heureDepartMin - heureArriveeMin
+  matiere         Matiere? @relation(fields: [matiereId], references: [id])
+  matiereId       Int?     // optionnelle : seule source de matiere pour un prof sans emploi du temps/cours (voir fiche d'emargement)
   motif           String
   dateSaisie      DateTime @default(now())
   saisiePar       Utilisateur @relation(fields: [saisieParId], references: [id])

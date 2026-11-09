@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 
 type Ligne = { date: string; heureArrivee: string; heureDepart: string };
 type Professeur = { id: number; label: string };
+type Matiere = { id: number; label: string };
 
 const LIGNE_VIDE: Ligne = { date: "", heureArrivee: "", heureDepart: "" };
 
@@ -28,9 +29,18 @@ function formatDuree(ligne: Ligne): string {
   return `${(duree / 60).toFixed(2)} h`;
 }
 
-export default function SaisieManuelleForm({ professeurs, periodeId }: { professeurs: Professeur[]; periodeId: number }) {
+export default function SaisieManuelleForm({
+  professeurs,
+  matieres,
+  periodeId,
+}: {
+  professeurs: Professeur[];
+  matieres: Matiere[];
+  periodeId: number;
+}) {
   const router = useRouter();
   const [professeurId, setProfesseurId] = useState("");
+  const [matiereId, setMatiereId] = useState("");
   const [motif, setMotif] = useState("");
   const [lignes, setLignes] = useState<Ligne[]>([{ ...LIGNE_VIDE }]);
   const [envoi, setEnvoi] = useState(false);
@@ -70,7 +80,13 @@ export default function SaisieManuelleForm({ professeurs, periodeId }: { profess
     const reponse = await fetch("/api/admin/heures-manuelles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ professeurId: Number(professeurId), periodeId, motif, lignes: lignesCompletes }),
+      body: JSON.stringify({
+        professeurId: Number(professeurId),
+        periodeId,
+        matiereId: matiereId ? Number(matiereId) : undefined,
+        motif,
+        lignes: lignesCompletes,
+      }),
     });
     const data = await reponse.json();
     setEnvoi(false);
@@ -82,6 +98,7 @@ export default function SaisieManuelleForm({ professeurs, periodeId }: { profess
 
     setSucces(`${data.nbLignes} ligne(s) enregistrée(s).`);
     setProfesseurId("");
+    setMatiereId("");
     setMotif("");
     setLignes([{ ...LIGNE_VIDE }]);
     router.refresh();
@@ -102,14 +119,25 @@ export default function SaisieManuelleForm({ professeurs, periodeId }: { profess
         <p className="mb-4 rounded-lg bg-[var(--color-danger-bg)] px-3 py-2 text-sm text-[var(--color-danger)]">{erreur}</p>
       )}
 
-      <div className="mb-4">
-        <Label>Professeur</Label>
-        <Select value={professeurId} onChange={(e) => setProfesseurId(e.target.value)}>
-          <option value="">Professeur…</option>
-          {professeurs.map((p) => (
-            <option key={p.id} value={p.id}>{p.label}</option>
-          ))}
-        </Select>
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <div>
+          <Label>Professeur</Label>
+          <Select value={professeurId} onChange={(e) => setProfesseurId(e.target.value)}>
+            <option value="">Professeur…</option>
+            {professeurs.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </Select>
+        </div>
+        <div>
+          <Label>Matière (si ce professeur n&apos;a pas d&apos;emploi du temps)</Label>
+          <Select value={matiereId} onChange={(e) => setMatiereId(e.target.value)}>
+            <option value="">Matière…</option>
+            {matieres.map((m) => (
+              <option key={m.id} value={m.id}>{m.label}</option>
+            ))}
+          </Select>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-col gap-2">

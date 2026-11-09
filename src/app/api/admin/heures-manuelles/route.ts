@@ -18,15 +18,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ erreur: "Non autorise." }, { status: 403 });
   }
 
-  const { professeurId, periodeId, motif, lignes } = (await request.json()) as {
+  const { professeurId, periodeId, matiereId, motif, lignes } = (await request.json()) as {
     professeurId?: number;
     periodeId?: number;
+    matiereId?: number;
     motif?: string;
     lignes?: LigneEntree[];
   };
 
   if (!professeurId || !periodeId) {
     return NextResponse.json({ erreur: "Professeur et période obligatoires." }, { status: 400 });
+  }
+  if (matiereId) {
+    const matiere = await prisma.matiere.findUnique({ where: { id: matiereId } });
+    if (!matiere) return NextResponse.json({ erreur: "Matière invalide." }, { status: 400 });
   }
   if (!motif || !motif.trim()) {
     return NextResponse.json({ erreur: "Le motif est obligatoire." }, { status: 400 });
@@ -42,6 +47,7 @@ export async function POST(request: Request) {
     heureArriveeMin: number;
     heureDepartMin: number;
     dureeMin: number;
+    matiereId: number | null;
     motif: string;
     saisieParId: number;
   }> = [];
@@ -67,6 +73,7 @@ export async function POST(request: Request) {
       heureArriveeMin: arrivee,
       heureDepartMin: depart,
       dureeMin: depart - arrivee,
+      matiereId: matiereId ?? null,
       motif: motif.trim(),
       saisieParId: session.userId,
     });

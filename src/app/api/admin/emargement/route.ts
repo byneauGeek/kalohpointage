@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { lireSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { calculerComptabilisation, detailSessionsProfesseur, matieresEnseigneesProfesseur } from "@/lib/comptabilisation";
+import { calculerComptabilisation, matieresExactesProfesseur, matieresEnseigneesProfesseur } from "@/lib/comptabilisation";
 import { genererEmargementPdf, type LigneEmargement } from "@/lib/emargementPdf";
 import { resoudreMoisCalendaire } from "@/lib/moisCalendaire";
 
@@ -32,12 +32,12 @@ export async function GET(request: Request) {
 
   const lignes: LigneEmargement[] = await Promise.all(
     lignesAvecHeures.map(async (l) => {
-      const { parMatiere } = await detailSessionsProfesseur(l.professeurId, dateDebut, dateFin);
-      // Sessions validees d'abord (matiere exacte de chaque cours) ; a
-      // defaut (heures uniquement saisies manuellement, sans matiere
-      // propre), on retombe sur l'emploi du temps du professeur.
-      const matieres = parMatiere.length > 0
-        ? parMatiere.map((m) => m.matiere)
+      // Matiere exacte d'abord (Cours valides ou saisie manuelle qui en
+      // precise une) ; a defaut, on retombe sur l'emploi du temps du
+      // professeur (moins precis, mais mieux qu'une case vide).
+      const matieresExactes = await matieresExactesProfesseur(l.professeurId, dateDebut, dateFin);
+      const matieres = matieresExactes.length > 0
+        ? matieresExactes
         : await matieresEnseigneesProfesseur(l.professeurId, dateDebut, dateFin);
       return {
         matricule: l.matricule,

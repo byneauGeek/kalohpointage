@@ -23,16 +23,17 @@ export default async function PageHeuresManuelles({
   await exigerRole(["ADMIN"]);
   const { periodeId, succes } = await searchParams;
 
-  const [periodes, professeurs] = await Promise.all([
+  const [periodes, professeurs, matieres] = await Promise.all([
     prisma.periode.findMany({ orderBy: { dateDebut: "desc" } }),
     prisma.professeur.findMany({ where: { actif: true }, orderBy: { nom: "asc" } }),
+    prisma.matiere.findMany({ where: { actif: true }, orderBy: { libelle: "asc" } }),
   ]);
   const periodeChoisie = periodeId ? periodes.find((p) => p.id === Number(periodeId)) : periodes[0];
 
   const saisies = periodeChoisie
     ? await prisma.saisieHeuresManuelle.findMany({
         where: { periodeId: periodeChoisie.id },
-        include: { professeur: true, saisiePar: true },
+        include: { professeur: true, saisiePar: true, matiere: true },
         orderBy: [{ date: "desc" }, { heureArriveeMin: "asc" }],
       })
     : [];
@@ -58,6 +59,7 @@ export default async function PageHeuresManuelles({
         <Reveal delay={0.06}>
           <SaisieManuelleForm
             professeurs={professeurs.map((p) => ({ id: p.id, label: `${p.nom} ${p.prenom} (${p.matricule})` }))}
+            matieres={matieres.map((m) => ({ id: m.id, label: m.libelle }))}
             periodeId={periodeChoisie.id}
           />
         </Reveal>
@@ -71,6 +73,7 @@ export default async function PageHeuresManuelles({
             <Th>Arrivée</Th>
             <Th>Départ</Th>
             <Th>Durée</Th>
+            <Th>Matière</Th>
             <Th>Motif</Th>
             <Th>Saisi par</Th>
             <Th></Th>
@@ -85,6 +88,7 @@ export default async function PageHeuresManuelles({
                 <Td className="font-mono text-xs">{formatHeureHorloge(s.heureArriveeMin)}</Td>
                 <Td className="font-mono text-xs">{formatHeureHorloge(s.heureDepartMin)}</Td>
                 <Td className="font-mono text-xs">{(s.dureeMin / 60).toFixed(2)} h</Td>
+                <Td>{s.matiere ? s.matiere.libelle : <span className="text-[var(--color-navy-900)]/40">—</span>}</Td>
                 <Td className="max-w-xs truncate" title={s.motif}>{s.motif}</Td>
                 <Td>{s.saisiePar.nomUtilisateur}</Td>
                 <Td>
@@ -99,7 +103,7 @@ export default async function PageHeuresManuelles({
               </Tr>
             ))}
             {saisies.length === 0 && (
-              <tr><td colSpan={8}><EmptyState>Aucune saisie manuelle pour cette période.</EmptyState></td></tr>
+              <tr><td colSpan={9}><EmptyState>Aucune saisie manuelle pour cette période.</EmptyState></td></tr>
             )}
           </tbody>
         </Table>
