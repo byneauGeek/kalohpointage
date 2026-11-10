@@ -70,6 +70,7 @@ export async function modifierProfesseur(professeurId: number, formData: FormDat
   const statut = String(formData.get("statut"));
   const salaireFixe = formData.get("salaireFixeMensuel");
   const quota = formData.get("quotaHeuresMensuel");
+  const matiereId = formData.get("matiereId");
 
   const apres = await prisma.professeur.update({
     where: { id: professeurId },
@@ -82,6 +83,7 @@ export async function modifierProfesseur(professeurId: number, formData: FormDat
       tauxHoraireSpecifique: formData.get("tauxHoraireSpecifique") ? Number(formData.get("tauxHoraireSpecifique")) : null,
       salaireFixeMensuel: salaireFixe ? Number(salaireFixe) : null,
       quotaHeuresMensuelMin: quota ? Math.round(Number(quota) * 60) : null,
+      matiereId: matiereId ? Number(matiereId) : null,
     },
   });
 

@@ -11,7 +11,10 @@ import { Button } from "@/components/ui/Button";
 export default async function PageModifierProfesseur({ params }: { params: Promise<{ id: string }> }) {
   await exigerRole(["ADMIN"]);
   const { id } = await params;
-  const professeur = await prisma.professeur.findUnique({ where: { id: Number(id) } });
+  const [professeur, matieres] = await Promise.all([
+    prisma.professeur.findUnique({ where: { id: Number(id) } }),
+    prisma.matiere.findMany({ where: { actif: true }, orderBy: { libelle: "asc" } }),
+  ]);
   if (!professeur) notFound();
 
   const modifierAvecId = modifierProfesseur.bind(null, professeur.id);
@@ -43,6 +46,15 @@ export default async function PageModifierProfesseur({ params }: { params: Promi
           <div>
             <Label>Email</Label>
             <Input name="email" type="email" defaultValue={professeur.email ?? ""} />
+          </div>
+          <div>
+            <Label>Matière</Label>
+            <Select name="matiereId" defaultValue={professeur.matiereId ?? ""}>
+              <option value="">—</option>
+              {matieres.map((m) => (
+                <option key={m.id} value={m.id}>{m.libelle}</option>
+              ))}
+            </Select>
           </div>
           <div>
             <Label>Taux horaire spécifique</Label>

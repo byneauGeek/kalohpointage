@@ -34,11 +34,21 @@ export async function GET(request: Request) {
     lignesAvecHeures.map(async (l) => {
       // Matiere exacte d'abord (Cours valides ou saisie manuelle qui en
       // precise une) ; a defaut, on retombe sur l'emploi du temps du
-      // professeur (moins precis, mais mieux qu'une case vide).
+      // professeur (moins precis, mais mieux qu'une case vide) ; en dernier
+      // recours, la matiere principale saisie sur sa fiche (voir
+      // /admin/professeurs/[id]) - evite un "--" quand aucune des deux
+      // sources automatiques n'a de matiere pour ce mois.
       const matieresExactes = await matieresExactesProfesseur(l.professeurId, dateDebut, dateFin);
-      const matieres = matieresExactes.length > 0
+      let matieres = matieresExactes.length > 0
         ? matieresExactes
         : await matieresEnseigneesProfesseur(l.professeurId, dateDebut, dateFin);
+      if (matieres.length === 0) {
+        const prof = await prisma.professeur.findUnique({
+          where: { id: l.professeurId },
+          select: { matiere: { select: { libelle: true } } },
+        });
+        if (prof?.matiere) matieres = [prof.matiere.libelle];
+      }
       return {
         matricule: l.matricule,
         nom: l.nom,

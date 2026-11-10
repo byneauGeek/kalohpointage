@@ -97,6 +97,13 @@ model Professeur {
   dateCreation          DateTime  @default(now())
   dateModification      DateTime? @updatedAt
 
+  // Matiere principale du professeur, saisie sur sa fiche - sert de dernier
+  // recours pour la colonne "Matiere(s)" de la fiche d'emargement quand ni
+  // les Cours valides ni l'emploi du temps n'en indiquent une (voir
+  // src/app/api/admin/emargement/route.ts), ce qui evitait un "--" dans
+  // cette colonne.
+  matiere        Matiere?  @relation(fields: [matiereId], references: [id])
+  matiereId      Int?
   utilisateur    Utilisateur?
   emploisDuTemps EmploiDuTemps[]
   cours          Cours[]
@@ -142,6 +149,7 @@ model Matiere {
   affectations   AffectationEnseignement[]
   periodesEvitees MatierePeriodeEvitee[]
   saisiesManuelles SaisieHeuresManuelle[]
+  professeurs    Professeur[]
 
   @@map("matieres")
 }
